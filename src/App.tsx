@@ -6,7 +6,7 @@ import Layout from './components/Layout/Layout';
 import Login from './components/Auth/Login';
 import Register from './pages/Register';
 import PendingApproval from './pages/PendingApproval';
-import Dashboard from './pages/Dashboard';
+// import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
 import Invoices from './pages/Invoices';
 import Supplies from './pages/Supplies';
@@ -18,6 +18,7 @@ import Settings from './pages/Settings';
 import Inventory from './pages/Inventory';
 import { DialogProvider } from './contexts/DialogContext';
 import { ToastProvider } from './contexts/ToastContext';
+import Dashboard from './app/dashboard/dash';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser, userData } = useAuth();
