@@ -2,15 +2,15 @@ import React, { useMemo } from 'react';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 import { DollarSign,  Users, Package, FileText, ShoppingCart, AlertTriangle, Clock, Building2, UserCheck, Settings, Eye } from 'lucide-react';
 import { format, subMonths, startOfMonth, endOfMonth, eachMonthOfInterval } from 'date-fns';
-import { useAuth } from '../contexts/AuthContext';
-import { useProducts, useInvoices, useUsers, useFirestore, useShops, useSales } from '../hooks/useFirestore';
+import { useAuth } from '../hooks/useApi';
+import { useProducts, useInvoices, useUsers, useShops, useSales } from '../hooks/useApi';
 
 const Dashboard: React.FC = () => {
-  const { userData } = useAuth();
+  const { user } = useAuth();
   
   // Ensure proper shop isolation - all data should be filtered by shop
-  const currentShopId = userData?.shopId;
-  const isSuper = userData?.role === 'super_admin';
+  const currentShopId = user?.shopId;
+  const isSuper = user?.role === 'superadmin';
   
   
   // For shop isolation: Always fetch shop-specific data for operational metrics

@@ -1,6 +1,6 @@
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { apiGet, apiPost } from '../../services/api';
-import type { User } from '../../types';
+import { authApi } from '../../services/apiClient';
+import type { User } from '../../services/apiClient';
 
 interface AuthState {
   user?: User | null;
@@ -14,17 +14,17 @@ const initialState: AuthState = {
 };
 
 export const login = createAsyncThunk('auth/login', async (body: { email: string; password: string }) => {
-  const data = await apiPost<{ user: User }>('/auth/login', body);
+  const data = await authApi.login(body);
   return data.user;
 });
 
 export const fetchMe = createAsyncThunk('auth/me', async () => {
-  const data = await apiGet<{ user: User }>('/auth/me');
+  const data = await authApi.me();
   return data.user;
 });
 
 export const logout = createAsyncThunk('auth/logout', async () => {
-  await apiPost('/auth/logout');
+  await authApi.logout();
 });
 
 const authSlice = createSlice({

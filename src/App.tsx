@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import Layout from './components/Layout/Layout';
 import Login from './components/Auth/Login';
+import { LoginForm } from './components/login-form';
 import Register from './pages/Register';
 import PendingApproval from './pages/PendingApproval';
 // import Dashboard from './pages/Dashboard';
@@ -28,7 +29,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   }
   
   // If a shop admin has no assigned business yet, keep them on the registration flow to create a shop
-  if (userData && userData.role === 'shop_admin' && !userData.shopId) {
+  if (userData && userData.role === 'admin' && !userData.shopId) {
     return <Navigate to="/register" />;
   }
   
@@ -42,7 +43,7 @@ const AppRoutes: React.FC = () => {
   if (!currentUser) {
     return (
       <Routes>
-        <Route path="/login" element={<Login />} />
+        <Route path="/login" element={<LoginForm  />} />
         <Route path="/register" element={<Register />} />
         <Route path="*" element={<Navigate to="/login" />} />
       </Routes>

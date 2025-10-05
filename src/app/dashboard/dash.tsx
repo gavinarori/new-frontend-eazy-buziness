@@ -27,14 +27,14 @@ import {
   Settings,
 } from "lucide-react"
 import { format, subMonths, startOfMonth, endOfMonth, eachMonthOfInterval } from "date-fns"
-import { useAuth } from "@/contexts/AuthContext"
-import { useProducts, useInvoices, useUsers, useShops, useSales } from "@/hooks/useFirestore"
+import { useAuth } from "@/hooks/useApi"
+import { useProducts, useInvoices, useUsers, useShops, useSales } from "@/hooks/useApi"
 
 export default function Page() {
-  const { userData } = useAuth()
+  const { user, loading: authLoading } = useAuth()
 
-  const currentShopId = userData?.shopId
-  const isSuper = userData?.role === "super_admin"
+  const currentShopId = user?.shopId
+  const isSuper = user?.role === "superadmin"
 
   const { data: products, loading: productsLoading } = useProducts(currentShopId)
   const { data: invoices, loading: invoicesLoading } = useInvoices(currentShopId)
@@ -44,10 +44,9 @@ export default function Page() {
   const { data: allShops } = useShops()
   const { data: allUsers } = useUsers()
 
-  const loading = productsLoading || invoicesLoading || salesLoading || usersLoading
+  const loading = authLoading || productsLoading || invoicesLoading || salesLoading || usersLoading
 
-  const currentShop = allShops.find((shop) => shop.id === currentShopId)
-  const currency = currentShop?.currency || "USD"
+  const currency = "KSH" // Default currency since it's not in the current shop model
 
   const getCurrencySymbol = (c: string) => {
     switch (c) {
@@ -68,10 +67,10 @@ export default function Page() {
 
   const currencySymbol = getCurrencySymbol(currency)
 
-  const pendingShops = allShops.filter((shop) => !shop.isActive)
-  const activeShops = allShops.filter((shop) => shop.isActive)
-  const pendingUsers = allUsers.filter((user) => !user.isActive)
-  const activeUsers = allUsers.filter((user) => user.isActive)
+  const pendingShops = allShops?.filter((shop) => shop.status === "pending") || []
+  const activeShops = allShops?.filter((shop) => shop.status === "approved") || []
+  const pendingUsers = (allUsers || []).filter((user: any) => user.role === "customer") // Assuming customers need approval
+  const activeUsers = (allUsers || []).filter((user: any) => user.role !== "customer")
 
   const salesData = useMemo(() => {
     if (isSuper) return []
@@ -85,13 +84,13 @@ export default function Page() {
       const monthStart = startOfMonth(month)
       const monthEnd = endOfMonth(month)
 
-      const monthInvoices = invoices.filter((invoice) => {
-        const invoiceDate = invoice.createdAt instanceof Date ? invoice.createdAt : new Date(invoice.createdAt)
+      const monthInvoices = (invoices || []).filter((invoice) => {
+        const invoiceDate = new Date(invoice.createdAt)
         return invoiceDate >= monthStart && invoiceDate <= monthEnd
       })
 
-      const monthSales = sales.filter((sale) => {
-        const saleDate = sale.createdAt instanceof Date ? sale.createdAt : new Date(sale.createdAt)
+      const monthSales = (sales || []).filter((sale) => {
+        const saleDate = new Date(sale.createdAt)
         return saleDate >= monthStart && saleDate <= monthEnd
       })
 
@@ -111,8 +110,8 @@ export default function Page() {
   const categoryData = useMemo(() => {
     if (isSuper) return []
 
-    const categoryStats = products.reduce((acc: Record<string, { count: number; value: number }>, product) => {
-      const category = product.category || "Uncategorized"
+    const categoryStats = (products || []).reduce((acc: Record<string, { count: number; value: number }>, product) => {
+      const category = product.categoryId || "Uncategorized" // Using categoryId since we don't have category name directly
       if (!acc[category]) {
         acc[category] = { count: 0, value: 0 }
       }
@@ -132,22 +131,22 @@ export default function Page() {
   }, [products, isSuper])
 
   const totalRevenue =
-    invoices.reduce((sum, invoice) => sum + invoice.total, 0) + sales.reduce((sum, sale) => sum + sale.total, 0)
-  const totalProducts = products.length
-  const totalInvoices = invoices.length
-  const totalSales = sales.length
-  const totalStaff = users.filter((user) => user.role === "staff").length
-  const lowStockItems = products.filter((product) => product.stock <= product.minStock).length
-  const pendingInvoices = invoices.filter((invoice) => invoice.status === "pending").length
+    (invoices || []).reduce((sum, invoice) => sum + invoice.total, 0) + (sales || []).reduce((sum, sale) => sum + sale.total, 0)
+  const totalProducts = (products || []).length
+  const totalInvoices = (invoices || []).length
+  const totalSales = (sales || []).length
+  const totalStaff = (users || []).filter((user: any) => user.role === "seller").length // Using 'seller' instead of 'staff'
+  const lowStockItems = (products || []).filter((product) => product.stock <= 5).length // Using 5 as default low stock threshold
+  const pendingInvoices = (invoices || []).filter((invoice) => invoice.status === "draft" || invoice.status === "sent").length
 
   const recentInvoices = useMemo(() => {
     if (isSuper) return []
 
-    return invoices
+    return (invoices || [])
       .filter((invoice) => invoice.status === "paid")
       .sort((a, b) => {
-        const dateA = a.paidAt ? (a.paidAt instanceof Date ? a.paidAt : new Date(a.paidAt)) : new Date(0)
-        const dateB = b.paidAt ? (b.paidAt instanceof Date ? b.paidAt : new Date(b.paidAt)) : new Date(0)
+        const dateA = new Date(a.createdAt)
+        const dateB = new Date(b.createdAt)
         return dateB.getTime() - dateA.getTime()
       })
       .slice(0, 5)
@@ -156,10 +155,10 @@ export default function Page() {
   const recentProducts = useMemo(() => {
     if (isSuper) return []
 
-    return products
+    return (products || [])
       .sort((a, b) => {
-        const dateA = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt)
-        const dateB = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt)
+        const dateA = new Date(a.createdAt)
+        const dateB = new Date(b.createdAt)
         return dateB.getTime() - dateA.getTime()
       })
       .slice(0, 5)
@@ -198,7 +197,7 @@ export default function Page() {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Businesses</p>
-                          <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{allShops.length}</p>
+                          <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{allShops?.length || 0}</p>
                           <p className="text-sm text-blue-600 mt-1">{activeShops.length} active</p>
                         </div>
                         <div className="p-3 bg-blue-100 rounded-lg">
@@ -224,7 +223,7 @@ export default function Page() {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Users</p>
-                          <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{allUsers.length}</p>
+                          <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{allUsers?.length || 0}</p>
                           <p className="text-sm text-green-600 mt-1">{activeUsers.length} active</p>
                         </div>
                         <div className="p-3 bg-green-100 rounded-lg">
@@ -285,7 +284,7 @@ export default function Page() {
                           </thead>
                           <tbody className="divide-y divide-gray-100 dark:divide-gray-600">
                             {pendingShops.map((shop) => {
-                              const admin = users.find((user) => user.id === shop.adminId || user.shopId === shop.id)
+                              const admin = (allUsers || []).find((user: any) => user.shopId === shop.id)
                               return (
                                 <tr key={shop.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                                   <td className="px-6 py-4 whitespace-nowrap">
@@ -295,24 +294,24 @@ export default function Page() {
                                       </div>
                                       <div className="ml-4">
                                         <p className="font-medium text-gray-800 dark:text-gray-200">{shop.name}</p>
-                                        <p className="text-sm text-gray-600 dark:text-gray-400">{shop.phone}</p>
+                                        <p className="text-sm text-gray-600 dark:text-gray-400">{shop.description || "No description"}</p>
                                       </div>
                                     </div>
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap">
                                     {admin ? (
                                       <div>
-                                        <p className="font-medium text-gray-800 dark:text-gray-200">{admin.name}</p>
-                                        <p className="text-sm text-gray-600 dark:text-gray-400">{admin.email}</p>
+                                        <p className="font-medium text-gray-800 dark:text-gray-200">{(admin as any).name}</p>
+                                        <p className="text-sm text-gray-600 dark:text-gray-400">{(admin as any).email}</p>
                                       </div>
                                     ) : (
                                       <span className="text-gray-500 dark:text-gray-400">No admin assigned</span>
                                     )}
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                                    {shop.createdAt ? format(shop.createdAt instanceof Date ? shop.createdAt : new Date(shop.createdAt), "MMM dd, yyyy") : "Unknown"}
+                                    {format(new Date(shop.createdAt), "MMM dd, yyyy")}
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{shop.address}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{shop.description || "No location"}</td>
                                   <td className="px-6 py-4 whitespace-nowrap">
                                     <button className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 transition-colors flex items-center space-x-1">
                                       <Settings size={14} />
@@ -358,8 +357,8 @@ export default function Page() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100 dark:divide-gray-600">
-                            {pendingUsers.map((user) => {
-                              const userShop = allShops.find((shop) => shop.id === user.shopId)
+                            {pendingUsers.map((user: any) => {
+                              const userShop = (allShops || []).find((shop) => shop.id === user.shopId)
                               return (
                                 <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                                   <td className="px-6 py-4 whitespace-nowrap">
@@ -384,7 +383,7 @@ export default function Page() {
                                     {userShop ? userShop.name : "No business assigned"}
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                                    {user.createdAt ? format(user.createdAt instanceof Date ? user.createdAt : new Date(user.createdAt), "MMM dd, yyyy") : "Unknown"}
+                                    {format(new Date(user.createdAt), "MMM dd, yyyy")}
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap">
                                     <button className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors flex items-center space-x-1">
@@ -560,7 +559,7 @@ export default function Page() {
                             <div key={invoice.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                               <div>
                                 <p className="font-medium text-gray-800 dark:text-gray-200">{invoice.customerName}</p>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">Invoice #{invoice.invoiceNumber}</p>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">Invoice #{invoice.id.slice(-8)}</p>
                               </div>
                               <div className="text-right">
                                 <p className="font-semibold text-green-600">
@@ -568,7 +567,7 @@ export default function Page() {
                                   {invoice.total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </p>
                                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                                  {invoice.paidAt ? format(invoice.paidAt instanceof Date ? invoice.paidAt : new Date(invoice.paidAt), "MMM dd") : "Recently"}
+                                  {format(new Date(invoice.createdAt), "MMM dd")}
                                 </p>
                               </div>
                             </div>
@@ -587,14 +586,14 @@ export default function Page() {
                             <div key={product.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                               <div className="flex items-center space-x-3">
                                 <img
-                                  src={product.images?.[0] || "https://images.pexels.com/photos/3394659/pexels-photo-3394659.jpeg?auto=compress&cs=tinysrgb&w=50"}
+                                  src={product.images?.[0]?.url || "https://images.pexels.com/photos/3394659/pexels-photo-3394659.jpeg?auto=compress&cs=tinysrgb&w=50"}
                                   alt={product.name}
                                   className="w-10 h-10 rounded-lg object-cover"
                                 />
-                                <div>
-                                  <p className="font-medium text-gray-800 dark:text-gray-200 truncate">{product.name}</p>
-                                  <p className="text-sm text-gray-600 dark:text-gray-400">{product.category}</p>
-                                </div>
+                                  <div>
+                                    <p className="font-medium text-gray-800 dark:text-gray-200 truncate">{product.name}</p>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">{product.categoryId || "Uncategorized"}</p>
+                                  </div>
                               </div>
                               <div className="text-right">
                                 <p className="font-semibold text-blue-600">
