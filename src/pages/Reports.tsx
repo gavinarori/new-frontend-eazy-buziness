@@ -6,7 +6,11 @@ import { jsPDF } from 'jspdf';
 import { useToast } from '../contexts/ToastContext';
 import autoTable from 'jspdf-autotable';
 import { useAuth } from '../contexts/AuthContext';
-import { useProducts, useInvoices, useSupplies, useUsers, useFirestore } from '../hooks/useFirestore';
+import { useAppDispatch, useAppSelector } from '../app/hooks';
+import { fetchProducts } from '../features/products/productsSlice';
+import { fetchInvoices } from '../features/invoices/invoicesSlice';
+import { fetchSupplies } from '../features/supplies/suppliesSlice';
+import { fetchShops } from '../features/shops/shopsSlice';
 import { format, subMonths, startOfMonth, endOfMonth, eachMonthOfInterval } from 'date-fns';
 
 const Reports: React.FC = () => {
@@ -14,14 +18,19 @@ const Reports: React.FC = () => {
   const [dateRange, setDateRange] = useState('30');
   const [reportType, setReportType] = useState('sales');
 
-  // Fetch real data
-  const { data: products, loading: productsLoading } = useProducts(userData?.shopId);
-  const { data: invoices, loading: invoicesLoading } = useInvoices(userData?.shopId);
-  const { data: supplies, loading: suppliesLoading } = useSupplies(userData?.shopId);
-  const { data: users, loading: usersLoading } = useUsers(userData?.shopId);
-  const { data: shops } = useFirestore('shops');
+  const dispatch = useAppDispatch();
+  const products = useAppSelector(s => s.products.items as any[]);
+  const invoices = useAppSelector(s => s.invoices.items as any[]);
+  const supplies = useAppSelector(s => s.supplies.items as any[]);
+  const shops = useAppSelector(s => s.shops.items as any[]);
+  const loading = useAppSelector(s => s.products.loading || s.invoices.loading || s.supplies.loading || s.shops.loading);
 
-  const loading = productsLoading || invoicesLoading || suppliesLoading || usersLoading;
+  React.useEffect(() => {
+    dispatch(fetchProducts({ shopId: userData?.shopId } as any));
+    dispatch(fetchInvoices({} as any));
+    dispatch(fetchSupplies({} as any));
+    dispatch(fetchShops());
+  }, [dispatch, userData?.shopId]);
   const { showToast } = useToast();
 
   // Get current shop data for currency
@@ -104,7 +113,7 @@ const Reports: React.FC = () => {
 
   // Generate staff performance data
   const generateStaffPerformance = () => {
-    const staffMembers = users.filter(user => user.role === 'staff');
+    const staffMembers: any[] = []; // TODO: fetch from users slice when available
     
     return staffMembers.map(staff => {
       const staffInvoices = invoices.filter(invoice => invoice.createdBy === staff.id);
@@ -181,7 +190,7 @@ const Reports: React.FC = () => {
       const filteredSupplyCost = filteredSupplies.reduce((sum, supply) => sum + (supply.totalCost || supply.cost || 0), 0);
       
       // Calculate filtered staff performance
-      const filteredStaffPerformance = users.filter(user => user.role === 'staff').map(staff => {
+      const filteredStaffPerformance = ([] as any[]).map(staff => {
         const staffInvoices = filteredInvoices.filter(invoice => invoice.createdBy === staff.id);
         const sales = staffInvoices.length;
         const commissionRate = (staff.commissionRate || 5) / 100;

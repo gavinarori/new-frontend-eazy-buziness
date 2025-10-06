@@ -1,11 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, Timestamp, collection } from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
 import { Building2, User, ArrowLeft, CheckCircle } from 'lucide-react';
-import { auth, db } from '../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { authApi, shopsApi } from '../services/apiClient';
 
 interface UserFormData {
   name: string;
@@ -29,7 +27,7 @@ const Register: React.FC = () => {
   const [step, setStep] = useState<'user' | 'shop' | 'done'>('user');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [createdUserId, setCreatedUserId] = useState<string>('');
+  // No local user id needed; backend associates created shop with admin later
   const [success, setSuccess] = useState(false);
 
   const { register: registerUser, handleSubmit: handleSubmitUser, watch, formState: { errors: userErrors } } = useForm<UserFormData>();
@@ -41,11 +39,8 @@ const Register: React.FC = () => {
 
   // If already authenticated as shop_admin without a shop, jump straight to shop creation
   useEffect(() => {
-    if (currentUser && userData?.role === 'shop_admin') {
-      setCreatedUserId(currentUser.uid);
-      if (!userData.shopId) {
-        setStep('shop');
-      }
+    if (currentUser && userData?.role === 'shop_admin' && !userData.shopId) {
+      setStep('shop');
     }
   }, [currentUser, userData]);
 
@@ -57,40 +52,16 @@ const Register: React.FC = () => {
         throw new Error('Passwords do not match');
       }
 
-      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
-      const userId = userCredential.user.uid;
-      setCreatedUserId(userId);
-
-      await setDoc(doc(db, 'users', userId), {
-        name: data.name,
+      const { user } = await authApi.register({
         email: data.email,
-        phone: data.phone || '',
+        password: data.password,
+        name: data.name,
         role: 'shop_admin',
-        shopId: '', // no business assigned yet
-        permissions: [
-          'manage_products',
-          'create_invoices',
-          'manage_supplies',
-          'view_reports',
-          'manage_staff'
-        ],
-        isActive: true,
-        createdAt: Timestamp.now(),
-        salesTarget: 100,
-        commissionRate: 5
       });
 
       setStep('shop');
     } catch (err: any) {
-      if (err.code === 'auth/email-already-in-use') {
-        setError('This email address is already registered.');
-      } else if (err.code === 'auth/weak-password') {
-        setError('Password is too weak. Use at least 6 characters.');
-      } else if (err.code === 'auth/invalid-email') {
-        setError('Invalid email address format.');
-      } else {
-        setError(err.message || 'Failed to create account.');
-      }
+      setError(err.message || 'Failed to create account.');
     } finally {
       setLoading(false);
     }
@@ -100,18 +71,9 @@ const Register: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const shopRef = doc(collection(db, 'shops'));
-
-      await setDoc(shopRef, {
+      await shopsApi.create({
         name: data.name,
-        address: data.address,
-        phone: data.phone,
-        vatRate: parseFloat(data.vatRate) || 10,
-        currency: data.currency,
-        isActive: false,
-        createdAt: Timestamp.now(),
-        registeredBy: createdUserId,
-        adminId: createdUserId
+        description: `${data.address} | ${data.phone} | VAT ${data.vatRate}% | ${data.currency}`,
       });
 
       setSuccess(true);

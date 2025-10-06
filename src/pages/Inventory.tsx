@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Package, AlertTriangle, TrendingUp, Search, Download, Edit, Save, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { useProducts } from '../hooks/useFirestore';
-import { updateProduct } from '../utils/firebaseHelpers';
 import { useToast } from '../contexts/ToastContext';
 import { useDialog } from '../contexts/DialogContext';
+import { useAppDispatch, useAppSelector } from '../app/hooks';
+import { fetchProducts } from '../features/products/productsSlice';
+import { productsApi } from '../services/apiClient';
 
 const Inventory: React.FC = () => {
   const { userData } = useAuth();
@@ -16,30 +17,33 @@ const Inventory: React.FC = () => {
   const [newStock, setNewStock] = useState<number | ''>('');
   const [saving, setSaving] = useState(false);
 
-  const { data: products, loading: productsLoading } = useProducts(userData?.shopId);
+  const dispatch = useAppDispatch();
+  const products = useAppSelector((s) => s.products.items);
+  const productsLoading = useAppSelector((s) => s.products.loading);
+  useEffect(() => { dispatch(fetchProducts({ shopId: userData?.shopId } as any)); }, [dispatch, userData?.shopId]);
   const { showToast } = useToast();
   const { confirm } = useDialog();
 
   const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         product.sku.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = categoryFilter === 'all' || product.category === categoryFilter;
+    const matchesSearch = (product.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         (product.sku || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = categoryFilter === 'all' || (product as any).categoryId === categoryFilter;
     
     let matchesStock = true;
     if (stockFilter === 'low') {
-      matchesStock = product.stock <= product.minStock;
+      matchesStock = (product.stock || 0) <= 5;
     } else if (stockFilter === 'out') {
       matchesStock = product.stock === 0;
     } else if (stockFilter === 'good') {
-      matchesStock = product.stock > product.minStock;
+      matchesStock = (product.stock || 0) > 5;
     }
     
     return matchesSearch && matchesCategory && matchesStock;
   });
 
-  const categories = [...new Set(products.map(p => p.category))];
-  const totalStockValue = products.reduce((sum, product) => sum + (product.stock * product.cost), 0);
-  const lowStockItems = products.filter(p => p.stock <= p.minStock);
+  const categories = [...new Set(products.map(p => (p as any).categoryId || ''))].filter(Boolean) as string[];
+  const totalStockValue = products.reduce((sum, product) => sum + ((product.stock || 0) * (product.price || 0)), 0);
+  const lowStockItems = products.filter(p => (p.stock || 0) <= 5);
   const outOfStockItems = products.filter(p => p.stock === 0);
   const totalUnits = products.reduce((sum, product) => sum + product.stock, 0);
 
@@ -75,7 +79,8 @@ const Inventory: React.FC = () => {
 
     setSaving(true);
     try {
-      await updateProduct(editingProduct.id, { stock: Number(newStock) });
+      await productsApi.update(editingProduct.id, { stock: Number(newStock) });
+      await dispatch(fetchProducts({ shopId: userData?.shopId } as any));
       showToast({ type: 'success', title: 'Stock updated', message: `${editingProduct.name} stock set to ${newStock}.` });
       setShowStockModal(false);
       setEditingProduct(null);
@@ -258,14 +263,14 @@ const Inventory: React.FC = () => {
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {filteredProducts.map(product => {
                 const stockStatus = getStockStatus(product);
-                const stockValue = product.stock * product.cost;
+                const stockValue = (product.stock || 0) * (product.price || 0);
                 
                 return (
                   <tr key={product.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/60 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <img 
-                          src={product.images?.[0] || 'https://images.pexels.com/photos/3394659/pexels-photo-3394659.jpeg?auto=compress&cs=tinysrgb&w=50'} 
+                          src={(Array.isArray(product.images) ? (product.images[0]?.url) : undefined) || 'https://images.pexels.com/photos/3394659/pexels-photo-3394659.jpeg?auto=compress&cs=tinysrgb&w=50'} 
                           alt={product.name}
                           className="w-10 h-10 rounded-lg object-cover mr-3"
                         />
@@ -279,18 +284,16 @@ const Inventory: React.FC = () => {
                       {product.sku}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
-                      {product.category}
+                      {(product as any).categoryId || '—'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`font-semibold ${product.stock <= product.minStock ? 'text-red-600' : 'text-gray-800 dark:text-gray-100'}`}>
+                      <span className={`font-semibold ${(product.stock || 0) <= 5 ? 'text-red-600' : 'text-gray-800 dark:text-gray-100'}`}>
                         {product.stock} units
                       </span>
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">—</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
-                      {product.minStock} units
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
-                      ${product.cost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      ${(product.price || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="font-semibold text-green-600">

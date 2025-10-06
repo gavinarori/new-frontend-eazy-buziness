@@ -29,7 +29,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   }
   
   // If a shop admin has no assigned business yet, keep them on the registration flow to create a shop
-  if (userData && userData.role === 'admin' && !userData.shopId) {
+  if (userData ) {
     return <Navigate to="/register" />;
   }
   
