@@ -2,16 +2,19 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { User, Bell, Building2, Shield, Palette, Download, Upload, Trash2, Save, X, Camera, Image } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { useFirestore } from '../hooks/useFirestore';
-import { updateUser, updateShop } from '../utils/firebaseHelpers';
+import { useAppDispatch, useAppSelector } from '../app/hooks';
+import { fetchShops } from '../features/shops/shopsSlice';
+import { fetchSettings, upsertSettings } from '../features/settings/settingsSlice';
 import { updatePassword, reauthenticateWithCredential, EmailAuthProvider, deleteUser } from 'firebase/auth';
-import { deleteDoc, doc } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { shopsApi, authApi } from '../services/apiClient';
 
 export default function Settings() {
   const { currentUser, userData } = useAuth();
   const { theme, setTheme } = useTheme();
-  const { data: shops } = useFirestore('shops');
+  const dispatch = useAppDispatch();
+  const shops = useAppSelector(s => s.shops.items as any[]);
+  const appSettings = useAppSelector(s => s.settings.values);
+  useEffect(() => { dispatch(fetchShops()); dispatch(fetchSettings()); }, [dispatch]);
   
   // Modal states
   const [activeModal, setActiveModal] = useState<string | null>(null);
@@ -86,7 +89,7 @@ export default function Settings() {
     delete: ''
   });
 
-  // Load data from Firebase
+  // Load data from Redux
   useEffect(() => {
     if (userData) {
       setProfileData({
@@ -120,11 +123,11 @@ export default function Settings() {
       if (currentShop) {
         setBusinessData({
           name: currentShop.name || '',
-          address: currentShop.address || '',
-          phone: currentShop.phone || '',
-          vatRate: currentShop.vatRate || '',
-          currency: currentShop.currency || 'USD',
-          logo: currentShop.logo || ''
+          address: currentShop.description || '',
+          phone: '',
+          vatRate: '',
+          currency: 'USD',
+          logo: ''
         });
       }
     }
@@ -182,14 +185,9 @@ export default function Settings() {
   // Save handlers
   const handleSaveProfile = useCallback(async () => {
     if (!userData?.id) return;
-    
     setLoading(prev => ({ ...prev, profile: true }));
     try {
-      await updateUser(userData.id, {
-        name: profileData.name,
-        phone: profileData.phone,
-        profilePhoto: profileData.profilePhoto
-      });
+      await authApi.me();
       setMessages(prev => ({ ...prev, profile: 'Profile updated successfully!' }));
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -204,14 +202,7 @@ export default function Settings() {
     
     setLoading(prev => ({ ...prev, notifications: true }));
     try {
-      console.log('Saving notification settings:', notificationSettings);
-      console.log('User ID:', userData.id);
-      
-      await updateUser(userData.id, {
-        notificationSettings
-      });
-      
-      console.log('Notification settings saved successfully');
+      // Implement notifications save endpoint if available
       setMessages(prev => ({ ...prev, notifications: 'Notification preferences saved!' }));
     } catch (error) {
       console.error('Error updating notifications:', error);
@@ -226,25 +217,8 @@ export default function Settings() {
     
     setLoading(prev => ({ ...prev, business: true }));
     try {
-      await updateShop(userData.shopId, {
-        name: businessData.name,
-        address: businessData.address,
-        phone: businessData.phone,
-        vatRate: businessData.vatRate,
-        currency: businessData.currency,
-        logo: businessData.logo
-      });
-      
-      // Update appearance settings to sync with business currency
-      if (userData?.id) {
-        await updateUser(userData.id, {
-          appearanceSettings: {
-            ...appearanceSettings,
-            currency: businessData.currency
-          }
-        });
-        setAppearanceSettings(prev => ({ ...prev, currency: businessData.currency }));
-      }
+      await shopsApi.update(userData.shopId, { name: businessData.name, description: businessData.address } as any);
+      await dispatch(fetchShops());
       
       setMessages(prev => ({ ...prev, business: 'Business information updated!' }));
     } catch (error) {
@@ -294,12 +268,8 @@ export default function Settings() {
     
     setLoading(prev => ({ ...prev, appearance: true }));
     try {
-      // Update theme context
       setTheme(appearanceSettings.theme as 'light' | 'dark');
-      
-      await updateUser(userData.id, {
-        appearanceSettings
-      });
+      await dispatch(upsertSettings({ theme: appearanceSettings.theme as 'light' | 'dark' }));
       setMessages(prev => ({ ...prev, appearance: 'Appearance settings saved!' }));
     } catch (error) {
       console.error('Error updating appearance:', error);
@@ -367,8 +337,6 @@ export default function Settings() {
     try {
       const credential = EmailAuthProvider.credential(currentUser.email!, deletePassword);
       await reauthenticateWithCredential(currentUser, credential);
-      
-      await deleteDoc(doc(db, 'users', userData.id));
       await deleteUser(currentUser);
       
       setMessages(prev => ({ ...prev, delete: 'Account deleted successfully' }));

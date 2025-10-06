@@ -2,27 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Search, Edit, Trash2, Package, AlertCircle, Save, X, Tag } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../contexts/AuthContext';
-import { useProducts, useCategories } from '../hooks/useFirestore';
-import { addProduct, updateProduct, deleteProduct, addCategory, deleteCategory } from '../utils/firebaseHelpers';
 import { useDialog } from '../contexts/DialogContext';
 import { useToast } from '../contexts/ToastContext';
-
-interface Product {
-  id: string;
-  name: string;
-  description: string;
-  sku: string;
-  category: string;
-  price: number;
-  cost: number;
-  stock: number;
-  minStock: number;
-  image?: string;
-  images?: string[];
-  shopId: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
+import { useAppDispatch, useAppSelector } from '../app/hooks';
+import { fetchProducts } from '../features/products/productsSlice';
+import { fetchCategories } from '../features/categories/categoriesSlice';
+import { productsApi, categoriesApi } from '../services/apiClient';
+import type { Product } from '../types';
 
 interface ProductFormData {
   name: string;
@@ -42,6 +28,7 @@ interface CategoryFormData {
 
 const Products: React.FC = () => {
   const { userData } = useAuth();
+  const dispatch = useAppDispatch();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -54,8 +41,14 @@ const Products: React.FC = () => {
   const [imagePreview, setImagePreview] = useState<string>('');
   const [imageUploading, setImageUploading] = useState(false);
 
-  const { data: products, loading: productsLoading } = useProducts(userData?.shopId);
-  const { data: categories } = useCategories(userData?.shopId);
+  const products = useAppSelector((s) => s.products.items);
+  const productsLoading = useAppSelector((s) => s.products.loading);
+  const categories = useAppSelector((s) => s.categories.items);
+
+  useEffect(() => {
+    dispatch(fetchProducts({ shopId: userData?.shopId } as any));
+    dispatch(fetchCategories());
+  }, [dispatch, userData?.shopId]);
   const { register, handleSubmit, reset, formState: { errors } } = useForm<ProductFormData>();
   const { register: registerCategory, handleSubmit: handleSubmitCategory, reset: resetCategory, formState: { errors: categoryErrors } } = useForm<CategoryFormData>();
   const { confirm } = useDialog();
@@ -116,20 +109,21 @@ const Products: React.FC = () => {
         name: data.name,
         description: data.description,
         sku: data.sku,
-        category: data.category,
         price: Number(data.price),
-        cost: Number(data.cost),
         stock: Number(data.stock),
-        minStock: Number(data.minStock),
-        images: [imageUrl],
-        shopId: userData?.shopId || 'default'
-      };
+        images: [{ url: imageUrl, publicId: '' }],
+        shopId: userData?.shopId || 'default',
+        // Map category by id if provided
+        categoryId: data.category || undefined,
+      } as any;
 
       if (editingProduct) {
-        await updateProduct(editingProduct.id, productData);
+        await productsApi.update(editingProduct.id, productData);
+        await dispatch(fetchProducts({ shopId: userData?.shopId } as any));
         showToast({ type: 'success', title: 'Product updated', message: 'Product details saved successfully.' });
       } else {
-        await addProduct(productData);
+        await productsApi.create(productData);
+        await dispatch(fetchProducts({ shopId: userData?.shopId } as any));
         showToast({ type: 'success', title: 'Product added', message: 'New product has been added.' });
       }
       
@@ -151,10 +145,8 @@ const Products: React.FC = () => {
     setCategoryError('');
     
     try {
-      await addCategory({
-        name: data.name,
-        shopId: userData?.shopId || 'default'
-      });
+      await categoriesApi.create({ name: data.name, shopId: userData?.shopId || 'default' } as any);
+      await dispatch(fetchCategories());
       
       showToast({ type: 'success', title: 'Category added', message: 'New category has been added.' });
       resetCategory();
@@ -188,7 +180,8 @@ const Products: React.FC = () => {
     const ok = await confirm({ title: 'Delete product', message: 'Are you sure you want to delete this product? This action cannot be undone.', tone: 'danger', confirmText: 'Delete', cancelText: 'Cancel' });
     if (ok) {
       try {
-        await deleteProduct(productId);
+        await productsApi.delete(productId);
+        await dispatch(fetchProducts({ shopId: userData?.shopId } as any));
         showToast({ type: 'success', title: 'Product deleted', message: 'The product has been removed.' });
       } catch (err) {
         console.error('Error deleting product:', err);
@@ -199,7 +192,7 @@ const Products: React.FC = () => {
 
   const handleDeleteCategory = async (categoryId: string, categoryName: string) => {
     // Check if any products use this category
-    const productsUsingCategory = products.filter(product => product.category === categoryName);
+    const productsUsingCategory = products.filter(product => product.categoryId === categoryId);
     
     if (productsUsingCategory.length > 0) {
       showToast({ type: 'warning', title: 'Cannot delete', message: `Category "${categoryName}" is used by ${productsUsingCategory.length} product(s).` });
@@ -209,7 +202,8 @@ const Products: React.FC = () => {
     const ok = await confirm({ title: 'Delete category', message: `Are you sure you want to delete the category "${categoryName}"?`, tone: 'danger', confirmText: 'Delete', cancelText: 'Cancel' });
     if (ok) {
       try {
-        await deleteCategory(categoryId);
+        await categoriesApi.delete(categoryId);
+        await dispatch(fetchCategories());
         showToast({ type: 'success', title: 'Category deleted', message: 'The category has been removed.' });
       } catch (err) {
         console.error('Error deleting category:', err);
@@ -219,13 +213,14 @@ const Products: React.FC = () => {
   };
 
   const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         product.sku.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory;
+    const matchesSearch = (product.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         (product.sku || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = selectedCategory === 'all' || product.categoryId === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
-  const lowStockProducts = products.filter(product => product.stock <= product.minStock);
+  const lowStockThreshold = 5;
+  const lowStockProducts = products.filter(product => (product.stock || 0) <= lowStockThreshold);
 
   if (productsLoading) {
     return (
@@ -366,7 +361,7 @@ const Products: React.FC = () => {
           >
             <option value="all">All Categories</option>
             {categories.map(category => (
-              <option key={category.id} value={category.name}>{category.name}</option>
+              <option key={category.id} value={category.id}>{category.name}</option>
             ))}
           </select>
         </div>
@@ -418,18 +413,18 @@ const Products: React.FC = () => {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600 dark:text-gray-300 ">Stock:</span>
-                  <span className={`font-semibold ${product.stock <= product.minStock ? 'text-red-600' : 'text-gray-800'}`}>
+                  <span className={`font-semibold ${(product.stock || 0) <= lowStockThreshold ? 'text-red-600' : 'text-gray-800'}`}>
                     {product.stock} units
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-300">Min Stock:</span>
-                  <span className="text-gray-600 dark:text-gray-300 ">{product.minStock} units</span>
+                  <span className="text-gray-600 dark:text-gray-300">Category:</span>
+                  <span className="text-gray-600 dark:text-gray-300 ">{categories.find(c => c.id === (product as any).categoryId)?.name || '—'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600 dark:text-gray-300 ">Value:</span>
                   <span className="font-semibold text-blue-600">
-                    ${(product.stock * product.cost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ${(((product.stock || 0) * (product.price || 0))).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>
@@ -521,7 +516,7 @@ const Products: React.FC = () => {
                   >
                     <option value="">Select category</option>
                     {categories.map(category => (
-                      <option key={category.id} value={category.name}>{category.name}</option>
+                      <option key={category.id} value={category.id}>{category.name}</option>
                     ))}
                   </select>
                   {errors.category && (

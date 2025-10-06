@@ -23,15 +23,11 @@ import {
 import { format } from "date-fns"
 import { useForm, useFieldArray } from "react-hook-form"
 import { useAuth } from "../contexts/AuthContext"
-import { useInvoices, useProducts, useFirestore, useSales } from "../hooks/useFirestore"
-import {
-  createInvoice,
-  updateInvoice,
-  deleteInvoice,
-  updateProduct,
-  createSale,
-  updateSale,
-} from "../utils/firebaseHelpers"
+import { useAppDispatch, useAppSelector } from "../app/hooks"
+import { fetchInvoices, createInvoiceThunk, updateInvoiceStatus } from "../features/invoices/invoicesSlice"
+import { fetchProducts } from "../features/products/productsSlice"
+import { fetchShops } from "../features/shops/shopsSlice"
+import { invoicesApi, productsApi } from "../services/apiClient"
 import type { Invoice, InvoiceItem, SaleItem } from "../types"
 import { jsPDF } from "jspdf"
 import { useDialog } from "../contexts/DialogContext"
@@ -213,11 +209,16 @@ const Invoices: React.FC = () => {
 
   // Ensure proper shop isolation - only fetch data for current user's shop
   const currentShopId = userData?.shopId
-  const { data: invoices, loading: invoicesLoading } = useInvoices(currentShopId)
-  const { data: products } = useProducts(currentShopId)
-  const { data: sales } = useSales(currentShopId)
-  // Only fetch the current shop data, not all shops
-  const { data: allShops } = useFirestore("shops")
+  const dispatch = useAppDispatch()
+  const invoices = useAppSelector(s => s.invoices.items as any[])
+  const invoicesLoading = useAppSelector(s => s.invoices.loading)
+  const products = useAppSelector(s => s.products.items as any[])
+  const allShops = useAppSelector(s => s.shops.items as any[])
+  useEffect(() => {
+    dispatch(fetchInvoices({} as any))
+    dispatch(fetchProducts({ shopId: currentShopId } as any))
+    dispatch(fetchShops())
+  }, [dispatch, currentShopId])
   const currentShop = allShops.find((shop) => shop.id === currentShopId)
 
   const { confirm } = useDialog()

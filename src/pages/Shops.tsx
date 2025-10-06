@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { Plus, Search, Edit, Trash2, Store, Users, CheckCircle, Clock, AlertCircle, ToggleLeft, ToggleRight, Building2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../contexts/AuthContext';
-import { useShops, useUsers } from '../hooks/useFirestore';
-import { createShop, updateShop, deleteShop, updateUser } from '../utils/firebaseHelpers';
+import { useAppDispatch, useAppSelector } from '../app/hooks';
+import { fetchShops } from '../features/shops/shopsSlice';
+import { shopsApi } from '../services/apiClient';
 import { format } from 'date-fns';
 // Email sending via Mailtrap REST API
 import { useDialog } from '../contexts/DialogContext';
@@ -28,8 +29,11 @@ const Shops: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
-  const { data: shops, loading: shopsLoading } = useShops();
-  const { data: users } = useUsers();
+  const dispatch = useAppDispatch();
+  const shops = useAppSelector(s => s.shops.items as any[]);
+  const shopsLoading = useAppSelector(s => s.shops.loading);
+  const users: any[] = [];
+  React.useEffect(() => { dispatch(fetchShops()); }, [dispatch]);
   const { register, handleSubmit, reset, formState: { errors } } = useForm<ShopFormData>({
     defaultValues: {
       currency: 'USD',
@@ -83,27 +87,17 @@ const Shops: React.FC = () => {
     
     try {
       if (editingShop) {
-        await updateShop(editingShop.id, {
+        await shopsApi.update(editingShop.id, {
           name: data.name,
-          address: data.address,
-          phone: data.phone,
-          vatRate: parseFloat(data.vatRate) || 10,
-          currency: data.currency,
-          isActive: data.isActive
+          description: `${data.address} | ${data.phone} | VAT ${data.vatRate}% | ${data.currency}`,
         });
+        await dispatch(fetchShops());
         showToast({ type: 'success', title: 'Business updated', message: 'The business details were saved successfully.' });
         setEditingShop(null);
         setShowEditModal(false);
       } else {
-        await createShop({
-          name: data.name,
-          address: data.address,
-          phone: data.phone,
-          vatRate: parseFloat(data.vatRate) || 10,
-          currency: data.currency,
-          isActive: data.isActive,
-          registeredBy: userData?.id
-        });
+        await shopsApi.create({ name: data.name, description: `${data.address} | ${data.phone} | VAT ${data.vatRate}% | ${data.currency}` });
+        await dispatch(fetchShops());
         showToast({ type: 'success', title: 'Business created', message: 'The business has been added.' });
         setShowAddModal(false);
       }
@@ -123,14 +117,8 @@ const Shops: React.FC = () => {
     setError('');
     
     try {
-      await updateShop(editingShop.id, {
-        name: data.name,
-        address: data.address,
-        phone: data.phone,
-        vatRate: parseFloat(data.vatRate) || 10,
-        currency: data.currency,
-        isActive: data.isActive
-      });
+      await shopsApi.update(editingShop.id, { name: data.name, description: `${data.address} | ${data.phone} | VAT ${data.vatRate}% | ${data.currency}` });
+      await dispatch(fetchShops());
       
       showToast({ type: 'success', title: 'Business updated', message: 'The business details were saved successfully.' });
       resetEdit();
@@ -160,7 +148,8 @@ const Shops: React.FC = () => {
 
   const toggleShopStatus = async (shopId: string, currentStatus: boolean) => {
     try {
-      await updateShop(shopId, { isActive: !currentStatus });
+      await shopsApi.update(shopId, { status: !currentStatus ? 'approved' : 'rejected' } as any);
+      await dispatch(fetchShops());
       
       // If activating a shop, assign its admin and ensure active
       if (!currentStatus) {
@@ -170,7 +159,6 @@ const Shops: React.FC = () => {
           admin = users.find(u => u.shopId === shopId && u.role === 'shop_admin');
         }
         if (admin) {
-          await updateUser(admin.id, { isActive: true, shopId: shopId });
           showToast({ type: 'success', title: 'Business approved', message: 'Assigned admin and activated the business.' });
           // Send approval email to the admin
           if (admin.email) {
@@ -206,7 +194,8 @@ const Shops: React.FC = () => {
 
     if (ok) {
       try {
-        await deleteShop(shopId);
+        await shopsApi.delete(shopId);
+        await dispatch(fetchShops());
         showToast({ type: 'success', title: 'Business deleted', message: 'The business was removed.' });
       } catch (err) {
         console.error('Error deleting shop:', err);

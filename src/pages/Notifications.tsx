@@ -4,7 +4,10 @@ import React, { useState } from "react"
 import { Bell, Check, Trash2, AlertCircle, Info, CheckCircle, AlertTriangle } from "lucide-react"
 import { format } from "date-fns"
 import { useAuth } from "../contexts/AuthContext"
-import { useFirestore, useProducts, useInvoices, useSupplies } from "../hooks/useFirestore"
+import { useAppDispatch, useAppSelector } from "../app/hooks"
+import { fetchProducts } from "../features/products/productsSlice"
+import { fetchSupplies } from "../features/supplies/suppliesSlice"
+import { fetchInvoices } from "../features/invoices/invoicesSlice"
 
 interface Notification {
   id: string
@@ -17,18 +20,19 @@ interface Notification {
 
 const Notifications: React.FC = () => {
   const { userData } = useAuth()
-  const { data: shops } = useFirestore("shops")
+  const dispatch = useAppDispatch()
+  const products = useAppSelector(s => s.products.items)
+  const invoices = useAppSelector(s => s.invoices.items as any[])
+  const supplies = useAppSelector(s => s.supplies.items as any[])
+  const loading = useAppSelector(s => s.products.loading || s.invoices.loading || s.supplies.loading)
+  const shops = useAppSelector(s => s.shops.items as any[])
   const [filter, setFilter] = useState("all")
 
-  // For super admin: fetch data from all shops, for others: fetch from their specific shop
-  const shopId = userData?.role === "super_admin" ? undefined : userData?.shopId
-
-  // Fetch real data
-  const { data: products, loading: productsLoading } = useProducts(shopId)
-  const { data: invoices, loading: invoicesLoading } = useInvoices(shopId)
-  const { data: supplies, loading: suppliesLoading } = useSupplies(shopId)
-
-  const loading = productsLoading || invoicesLoading || suppliesLoading
+  React.useEffect(() => {
+    dispatch(fetchProducts({ shopId: userData?.role === 'super_admin' ? undefined : userData?.shopId } as any))
+    dispatch(fetchInvoices({} as any))
+    dispatch(fetchSupplies({} as any))
+  }, [dispatch, userData?.role, userData?.shopId])
 
   const generateNotifications = (): Notification[] => {
     const notifications: Notification[] = []

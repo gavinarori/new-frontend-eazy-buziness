@@ -3,8 +3,10 @@ import { Plus, Search, Truck, Package, Calendar, DollarSign, Edit, Trash2, Save,
 import { format } from 'date-fns';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../contexts/AuthContext';
-import { useSupplies, useProducts } from '../hooks/useFirestore';
-import { addSupply, updateSupply, deleteSupply, updateProduct } from '../utils/firebaseHelpers';
+import { useAppDispatch, useAppSelector } from '../app/hooks';
+import { fetchSupplies } from '../features/supplies/suppliesSlice';
+import { fetchProducts } from '../features/products/productsSlice';
+import { suppliesApi, productsApi } from '../services/apiClient';
 import { Supply } from '../types';
 import { useDialog } from '../contexts/DialogContext';
 import { useToast } from '../contexts/ToastContext';
@@ -22,15 +24,21 @@ interface SupplyFormData {
 const Supplies: React.FC = () => {
   const { userData } = useAuth();
   const [showAddModal, setShowAddModal] = useState(false);
-  const [editingSupply, setEditingSupply] = useState<Supply | null>(null);
+  const [editingSupply, setEditingSupply] = useState<any | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const [showLoadMore, setShowLoadMore] = useState(false);
-  const { data: supplies, loading: suppliesLoading } = useSupplies(userData?.shopId);
-  const { data: products } = useProducts(userData?.shopId);
+  const dispatch = useAppDispatch();
+  const supplies = useAppSelector(s => s.supplies.items as any[]);
+  const suppliesLoading = useAppSelector(s => s.supplies.loading);
+  const products = useAppSelector(s => s.products.items as any[]);
+  useEffect(() => {
+    dispatch(fetchProducts({ shopId: userData?.shopId } as any));
+    dispatch(fetchSupplies({}));
+  }, [dispatch, userData?.shopId]);
   const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<SupplyFormData>();
   const { confirm } = useDialog();
   const { showToast } = useToast();
@@ -42,11 +50,12 @@ const Supplies: React.FC = () => {
   // Memoize filtered supplies for better performance
   const filteredSupplies = useMemo(() => {
     return supplies.filter(supply => {
-      const matchesSearch = supply.supplierName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           supply.productName.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesStatus = statusFilter === 'all' || supply.status === statusFilter;
+      const s: any = supply as any;
+      const matchesSearch = (s.supplierName || s.supplier || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           (s.productName || '').toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesStatus = statusFilter === 'all' || (s.status || 'received') === statusFilter;
       return matchesSearch && matchesStatus;
-    }).sort((a, b) => {
+    }).sort((a: any, b: any) => {
       const dateA = a.receivedAt instanceof Date ? a.receivedAt : new Date(a.receivedAt);
       const dateB = b.receivedAt instanceof Date ? b.receivedAt : new Date(b.receivedAt);
       return dateB.getTime() - dateA.getTime();
@@ -74,7 +83,7 @@ const Supplies: React.FC = () => {
         quantity: Number(data.quantity),
         unitCost: Number(data.unitCost),
         totalCost: Number(data.quantity) * Number(data.unitCost),
-        receivedAt: new Date(data.receivedAt),
+        receivedAt: new Date(data.receivedAt).toISOString(),
         status: data.status,
         notes: data.notes,
         shopId: userData?.shopId || 'default',
@@ -83,8 +92,8 @@ const Supplies: React.FC = () => {
 
       if (editingSupply) {
         // Handle stock changes when editing supply
-        const originalStatus = editingSupply.status;
-        const originalQuantity = editingSupply.quantity;
+        const originalStatus = (editingSupply as any).status;
+        const originalQuantity = (editingSupply as any).quantity;
         const newStatus = data.status;
         const newQuantity = Number(data.quantity);
         
@@ -116,7 +125,7 @@ const Supplies: React.FC = () => {
         }
         
         // Update supply record
-        await updateSupply(editingSupply.id, supplyData);
+        await suppliesApi.update(editingSupply.id, supplyData as any);
         
         // Update product stock if there's a change
         if (stockChange !== 0) {
@@ -125,22 +134,18 @@ const Supplies: React.FC = () => {
             throw new Error(`Cannot reduce stock below 0. Current stock: ${product.stock}, attempted reduction: ${Math.abs(stockChange)}`);
           }
           
-          await updateProduct(data.productId, {
-            stock: newStock
-          });
+          await productsApi.update(data.productId, { stock: newStock } as any);
           console.log(`Stock updated: ${product.stock} → ${newStock} for ${product.name}`);
         }
         
         showToast({ type: 'success', title: 'Supply updated', message: 'Supply details saved successfully.' });
       } else {
         // Add new supply record
-        await addSupply(supplyData);
+        await suppliesApi.create(supplyData as any);
         
         // Only add to stock if supply status is "received"
         if (data.status === 'received') {
-          await updateProduct(data.productId, {
-            stock: product.stock + Number(data.quantity)
-          });
+          await productsApi.update(data.productId, { stock: product.stock + Number(data.quantity) } as any);
           console.log(`Added ${data.quantity} units to stock for ${product.name} (new supply received)`);
         } else {
           console.log(`Supply added as ${data.status} - no stock change for ${product.name}`);
@@ -179,7 +184,8 @@ const Supplies: React.FC = () => {
     const ok = await confirm({ title: 'Delete supply', message: 'Are you sure you want to delete this supply record? This action cannot be undone.', tone: 'danger', confirmText: 'Delete', cancelText: 'Cancel' });
     if (ok) {
       try {
-        await deleteSupply(supplyId);
+        await suppliesApi.delete(supplyId);
+        await dispatch(fetchSupplies({}));
         showToast({ type: 'success', title: 'Supply deleted', message: 'The supply record has been removed.' });
       } catch (err) {
         console.error('Error deleting supply:', err);
@@ -198,8 +204,8 @@ const Supplies: React.FC = () => {
   };
 
   const totalCostSum = supplies.reduce((sum, supply) => sum + supply.totalCost, 0);
-  const receivedSupplies = supplies.filter(s => s.status === 'received').length;
-  const pendingSupplies = supplies.filter(s => s.status === 'pending').length;
+  const receivedSupplies = supplies.filter(s => (s as any).status === 'received').length;
+  const pendingSupplies = supplies.filter(s => (s as any).status === 'pending').length;
 
   if (suppliesLoading) {
     return (
