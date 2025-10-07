@@ -22,9 +22,9 @@ export default function LoginPage() {
       </div>
       <div className="bg-muted relative hidden lg:block">
         <img
-          src="/happy-positive-female-cashier-working-grocery-store.jpg"
+          src="https://github.com/gavinarori/new-frontend-eazy-buziness/blob/main/src/assests/happy-positive-female-cashier-working-grocery-store.jpg?raw=true"
           alt="Image"
-          className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+          className="absolute inset-0 h-full w-full object-cover  dark:grayscale"
         />
       </div>
     </div>
