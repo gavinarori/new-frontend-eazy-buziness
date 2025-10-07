@@ -1,4 +1,6 @@
-import React, { useMemo } from "react"
+"use client"
+
+import { useMemo } from "react"
 import {
   XAxis,
   YAxis,
@@ -22,10 +24,20 @@ import {
   Building2,
   UserCheck,
   Settings,
+  TrendingUp,
+  Activity,
 } from "lucide-react"
 import { format, subMonths, startOfMonth, endOfMonth, eachMonthOfInterval } from "date-fns"
 import { useAuth } from "@/hooks/useApi"
 import { useProducts, useInvoices, useUsers, useShops, useSales } from "@/hooks/useApi"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Separator } from "@/components/ui/separator"
 
 export default function Page() {
   const { user, loading: authLoading } = useAuth()
@@ -43,7 +55,7 @@ export default function Page() {
 
   const loading = authLoading || productsLoading || invoicesLoading || salesLoading || usersLoading
 
-  const currency = "KSH" // Default currency since it's not in the current shop model
+  const currency = "KSH"
 
   const getCurrencySymbol = (c: string) => {
     switch (c) {
@@ -66,7 +78,7 @@ export default function Page() {
 
   const pendingShops = allShops?.filter((shop) => shop.status === "pending") || []
   const activeShops = allShops?.filter((shop) => shop.status === "approved") || []
-  const pendingUsers = (allUsers || []).filter((user: any) => user.role === "customer") // Assuming customers need approval
+  const pendingUsers = (allUsers || []).filter((user: any) => user.role === "customer")
   const activeUsers = (allUsers || []).filter((user: any) => user.role !== "customer")
 
   const salesData = useMemo(() => {
@@ -108,7 +120,7 @@ export default function Page() {
     if (isSuper) return []
 
     const categoryStats = (products || []).reduce((acc: Record<string, { count: number; value: number }>, product) => {
-      const category = product.categoryId || "Uncategorized" // Using categoryId since we don't have category name directly
+      const category = product.categoryId || "Uncategorized"
       if (!acc[category]) {
         acc[category] = { count: 0, value: 0 }
       }
@@ -128,13 +140,16 @@ export default function Page() {
   }, [products, isSuper])
 
   const totalRevenue =
-    (invoices || []).reduce((sum, invoice) => sum + invoice.total, 0) + (sales || []).reduce((sum, sale) => sum + sale.total, 0)
+    (invoices || []).reduce((sum, invoice) => sum + invoice.total, 0) +
+    (sales || []).reduce((sum, sale) => sum + sale.total, 0)
   const totalProducts = (products || []).length
   const totalInvoices = (invoices || []).length
   const totalSales = (sales || []).length
-  const totalStaff = (users || []).filter((user: any) => user.role === "seller").length // Using 'seller' instead of 'staff'
-  const lowStockItems = (products || []).filter((product) => product.stock <= 5).length // Using 5 as default low stock threshold
-  const pendingInvoices = (invoices || []).filter((invoice) => invoice.status === "draft" || invoice.status === "sent").length
+  const totalStaff = (users || []).filter((user: any) => user.role === "seller").length
+  const lowStockItems = (products || []).filter((product) => product.stock <= 5).length
+  const pendingInvoices = (invoices || []).filter(
+    (invoice) => invoice.status === "draft" || invoice.status === "sent",
+  ).length
 
   const recentInvoices = useMemo(() => {
     if (isSuper) return []
@@ -161,446 +176,583 @@ export default function Page() {
       .slice(0, 5)
   }, [products, isSuper])
 
+  if (loading) {
+    return (
+      <div className="flex flex-1 flex-col">
+        <div className="@container/main flex flex-1 flex-col gap-2">
+          <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6 px-4 lg:px-6">
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-64" />
+              <Skeleton className="h-4 w-96" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[...Array(4)].map((_, i) => (
+                <Card key={i}>
+                  <CardContent className="p-6">
+                    <Skeleton className="h-20 w-full" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    
-        <div className="flex flex-1 flex-col">
-          <div className="@container/main flex flex-1 flex-col gap-2">
-            <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6 px-4 lg:px-6">
-              {loading ? (
-                <div className="flex items-center justify-center h-64">
-                  <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-                </div>
-              ) : isSuper ? (
-                <div className="space-y-6">
-                  <div>
-                    <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">Super Admin Dashboard</h1>
-                    <p className="mt-1 text-gray-600 dark:text-gray-400">
-                      Manage business onboarding and system-wide operations
-                    </p>
-                  </div>
+    <div className="flex flex-1 flex-col">
+      <div className="@container/main flex flex-1 flex-col gap-2">
+        <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6 px-4 lg:px-6">
+          {isSuper ? (
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <h1 className="text-3xl font-bold tracking-tight">Super Admin Dashboard</h1>
+                <p className="text-muted-foreground">Manage business onboarding and system-wide operations</p>
+              </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Businesses</p>
-                          <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{allShops?.length || 0}</p>
-                          <p className="text-sm text-blue-600 mt-1">{activeShops.length} active</p>
-                        </div>
-                        <div className="p-3 bg-blue-100 rounded-lg">
-                          <Building2 size={24} className="text-blue-600" />
-                        </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-muted-foreground">Total Businesses</p>
+                        <p className="text-2xl font-bold">{allShops?.length || 0}</p>
+                        <Badge variant="secondary" className="mt-1">
+                          {activeShops.length} active
+                        </Badge>
+                      </div>
+                      <div className="p-3 bg-primary/10 rounded-lg">
+                        <Building2 className="h-6 w-6 text-primary" />
                       </div>
                     </div>
+                  </CardContent>
+                </Card>
 
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending Onboarding</p>
-                          <p className="text-2xl font-bold text-orange-600">{pendingShops.length}</p>
-                          <p className="text-sm text-orange-600 mt-1">Awaiting approval</p>
-                        </div>
-                        <div className="p-3 bg-orange-100 rounded-lg">
-                          <Clock size={24} className="text-orange-600" />
-                        </div>
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-muted-foreground">Pending Onboarding</p>
+                        <p className="text-2xl font-bold text-orange-600">{pendingShops.length}</p>
+                        <Badge variant="outline" className="mt-1 border-orange-600 text-orange-600">
+                          Awaiting approval
+                        </Badge>
+                      </div>
+                      <div className="p-3 bg-orange-100 dark:bg-orange-900/20 rounded-lg">
+                        <Clock className="h-6 w-6 text-orange-600" />
                       </div>
                     </div>
+                  </CardContent>
+                </Card>
 
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Users</p>
-                          <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{allUsers?.length || 0}</p>
-                          <p className="text-sm text-green-600 mt-1">{activeUsers.length} active</p>
-                        </div>
-                        <div className="p-3 bg-green-100 rounded-lg">
-                          <Users size={24} className="text-green-600" />
-                        </div>
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-muted-foreground">Total Users</p>
+                        <p className="text-2xl font-bold">{allUsers?.length || 0}</p>
+                        <Badge
+                          variant="secondary"
+                          className="mt-1 bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400"
+                        >
+                          {activeUsers.length} active
+                        </Badge>
+                      </div>
+                      <div className="p-3 bg-green-100 dark:bg-green-900/20 rounded-lg">
+                        <Users className="h-6 w-6 text-green-600 dark:text-green-400" />
                       </div>
                     </div>
+                  </CardContent>
+                </Card>
 
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending Users</p>
-                          <p className="text-2xl font-bold text-red-600">{pendingUsers.length}</p>
-                          <p className="text-sm text-red-600 mt-1">Need activation</p>
-                        </div>
-                        <div className="p-3 bg-red-100 rounded-lg">
-                          <UserCheck size={24} className="text-red-600" />
-                        </div>
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-muted-foreground">Pending Users</p>
+                        <p className="text-2xl font-bold text-red-600">{pendingUsers.length}</p>
+                        <Badge variant="outline" className="mt-1 border-red-600 text-red-600">
+                          Need activation
+                        </Badge>
+                      </div>
+                      <div className="p-3 bg-red-100 dark:bg-red-900/20 rounded-lg">
+                        <UserCheck className="h-6 w-6 text-red-600 dark:text-red-400" />
                       </div>
                     </div>
-                  </div>
+                  </CardContent>
+                </Card>
+              </div>
 
-                  {pendingShops.length > 0 && (
-                    <div className="bg-orange-50 dark:bg-orange-900 border border-orange-200 dark:border-orange-700 rounded-lg p-4">
-                      <div className="flex items-center space-x-2">
-                        <AlertTriangle size={20} className="text-orange-600" />
-                        <h3 className="font-medium text-orange-800 dark:text-orange-200">Businesses Awaiting Onboarding</h3>
+              {pendingShops.length > 0 && (
+                <Alert
+                  variant="default"
+                  className="border-orange-200 bg-orange-50 dark:bg-orange-900/20 dark:border-orange-900"
+                >
+                  <AlertTriangle className="h-4 w-4 text-orange-600" />
+                  <AlertTitle className="text-orange-800 dark:text-orange-200">
+                    Businesses Awaiting Onboarding
+                  </AlertTitle>
+                  <AlertDescription className="text-orange-700 dark:text-orange-300">
+                    {pendingShops.length} business(es) have registered and are waiting for approval
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Pending Business Onboarding</CardTitle>
+                  <CardDescription>Review and approve new business registrations</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {pendingShops.length > 0 ? (
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Business Name</TableHead>
+                            <TableHead>Admin</TableHead>
+                            <TableHead>Registered</TableHead>
+                            <TableHead>Location</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {pendingShops.map((shop) => {
+                            const admin = (allUsers || []).find((user: any) => user.shopId === shop.id)
+                            return (
+                              <TableRow key={shop.id}>
+                                <TableCell>
+                                  <div className="flex items-center gap-3">
+                                    <Avatar className="h-10 w-10">
+                                      <AvatarFallback className="bg-primary/10">
+                                        <Building2 className="h-5 w-5 text-primary" />
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                      <p className="font-medium">{shop.name}</p>
+                                      <p className="text-sm text-muted-foreground">
+                                        {shop.description || "No description"}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  {admin ? (
+                                    <div>
+                                      <p className="font-medium">{(admin as any).name}</p>
+                                      <p className="text-sm text-muted-foreground">{(admin as any).email}</p>
+                                    </div>
+                                  ) : (
+                                    <span className="text-muted-foreground">No admin assigned</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  {format(new Date(shop.createdAt), "MMM dd, yyyy")}
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  {shop.description || "No location"}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Button size="sm" variant="outline">
+                                    <Settings className="h-4 w-4 mr-2" />
+                                    Manage
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            )
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <div className="rounded-full bg-muted p-4 mb-4">
+                        <Building2 className="h-8 w-8 text-muted-foreground" />
                       </div>
-                      <p className="text-orange-700 dark:text-orange-300 mt-1">
-                        {pendingShops.length} business(es) have registered and are waiting for approval
-                      </p>
+                      <p className="text-muted-foreground">No businesses pending onboarding</p>
                     </div>
                   )}
+                </CardContent>
+              </Card>
 
-                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-                    <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Pending Business Onboarding</h3>
-                    {pendingShops.length > 0 ? (
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead className="bg-gray-50 dark:bg-gray-700 border-b border-gray-100 dark:border-gray-600">
-                            <tr>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                Business Name
-                              </th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                Admin
-                              </th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                Registered
-                              </th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                Location
-                              </th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                Actions
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100 dark:divide-gray-600">
-                            {pendingShops.map((shop) => {
-                              const admin = (allUsers || []).find((user: any) => user.shopId === shop.id)
-                              return (
-                                <tr key={shop.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="flex items-center">
-                                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                                        <Building2 size={20} className="text-blue-600" />
-                                      </div>
-                                      <div className="ml-4">
-                                        <p className="font-medium text-gray-800 dark:text-gray-200">{shop.name}</p>
-                                        <p className="text-sm text-gray-600 dark:text-gray-400">{shop.description || "No description"}</p>
-                                      </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Pending User Approvals</CardTitle>
+                  <CardDescription>Review and activate new user accounts</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {pendingUsers.length > 0 ? (
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>User</TableHead>
+                            <TableHead>Role</TableHead>
+                            <TableHead>Business</TableHead>
+                            <TableHead>Registered</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {pendingUsers.map((user: any) => {
+                            const userShop = (allShops || []).find((shop) => shop.id === user.shopId)
+                            return (
+                              <TableRow key={user.id}>
+                                <TableCell>
+                                  <div className="flex items-center gap-3">
+                                    <Avatar>
+                                      <AvatarFallback>
+                                        {user?.name
+                                          ? user.name
+                                              .split(" ")
+                                              .map((n: string) => n[0])
+                                              .join("")
+                                          : "?"}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                      <p className="font-medium">{user.name}</p>
+                                      <p className="text-sm text-muted-foreground">{user.email}</p>
                                     </div>
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    {admin ? (
-                                      <div>
-                                        <p className="font-medium text-gray-800 dark:text-gray-200">{(admin as any).name}</p>
-                                        <p className="text-sm text-gray-600 dark:text-gray-400">{(admin as any).email}</p>
-                                      </div>
-                                    ) : (
-                                      <span className="text-gray-500 dark:text-gray-400">No admin assigned</span>
-                                    )}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                                    {format(new Date(shop.createdAt), "MMM dd, yyyy")}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{shop.description || "No location"}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    <button className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 transition-colors flex items-center space-x-1">
-                                      <Settings size={14} />
-                                      <span>Manage</span>
-                                    </button>
-                                  </td>
-                                </tr>
-                              )
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    ) : (
-                      <div className="text-center py-8">
-                        <Building2 size={48} className="mx-auto text-gray-400 mb-4" />
-                        <p className="text-gray-600 dark:text-gray-400">No businesses pending onboarding</p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-                    <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Pending User Approvals</h3>
-                    {pendingUsers.length > 0 ? (
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead className="bg-gray-50 dark:bg-gray-700 border-b border-gray-100 dark:border-gray-600">
-                            <tr>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                User
-                              </th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                Role
-                              </th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                Business
-                              </th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                Registered
-                              </th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                Actions
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100 dark:divide-gray-600">
-                            {pendingUsers.map((user: any) => {
-                              const userShop = (allShops || []).find((shop) => shop.id === user.shopId)
-                              return (
-                                <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="flex items-center">
-                                      <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
-                                        <span className="text-gray-600 font-medium text-sm">
-                                          {user?.name ? user.name.split(" ").map((n: string) => n[0]).join("") : "?"}
-                                        </span>
-                                      </div>
-                                      <div className="ml-4">
-                                        <p className="font-medium text-gray-800 dark:text-gray-200">{user.name}</p>
-                                        <p className="text-sm text-gray-600 dark:text-gray-400">{user.email}</p>
-                                      </div>
-                                    </div>
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 capitalize">
-                                      {user.role.replace("_", " ")}
-                                    </span>
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                                    {userShop ? userShop.name : "No business assigned"}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                                    {format(new Date(user.createdAt), "MMM dd, yyyy")}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    <button className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors flex items-center space-x-1">
-                                      <UserCheck size={14} />
-                                      <span>Approve</span>
-                                    </button>
-                                  </td>
-                                </tr>
-                              )
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    ) : (
-                      <div className="text-center py-8">
-                        <UserCheck size={48} className="mx-auto text-gray-400 mb-4" />
-                        <p className="text-gray-600 dark:text-gray-400">No users pending approval</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  <div>
-                    <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">Dashboard</h1>
-                    <p className="mt-1 text-gray-600 dark:text-gray-400">
-                      Welcome back! Here's what's happening with your business.
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Revenue</p>
-                          <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">
-                            {currencySymbol}
-                            {totalRevenue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </p>
-                        </div>
-                        <div className="p-3 bg-green-100 rounded-lg">
-                          <DollarSign size={24} className="text-green-600" />
-                        </div>
-                      </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="secondary" className="capitalize">
+                                    {user.role.replace("_", " ")}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  {userShop ? userShop.name : "No business assigned"}
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  {format(new Date(user.createdAt), "MMM dd, yyyy")}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                                    <UserCheck className="h-4 w-4 mr-2" />
+                                    Approve
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            )
+                          })}
+                        </TableBody>
+                      </Table>
                     </div>
-
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Products</p>
-                          <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{totalProducts.toLocaleString()}</p>
-                        </div>
-                        <div className="p-3 bg-blue-100 rounded-lg">
-                          <Package size={24} className="text-blue-600" />
-                        </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <div className="rounded-full bg-muted p-4 mb-4">
+                        <UserCheck className="h-8 w-8 text-muted-foreground" />
                       </div>
-                    </div>
-
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Invoices</p>
-                          <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{totalInvoices.toLocaleString()}</p>
-                        </div>
-                        <div className="p-3 bg-purple-100 rounded-lg">
-                          <FileText size={24} className="text-purple-600" />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Quick Sales</p>
-                          <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{totalSales.toLocaleString()}</p>
-                        </div>
-                        <div className="p-3 bg-green-100 rounded-lg">
-                          <ShoppingCart size={24} className="text-green-600" />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Staff Members</p>
-                          <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{totalStaff.toLocaleString()}</p>
-                        </div>
-                        <div className="p-3 bg-orange-100 rounded-lg">
-                          <Users size={24} className="text-orange-600" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {(lowStockItems > 0 || pendingInvoices > 0) && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {lowStockItems > 0 && (
-                        <div className="bg-yellow-50 dark:bg-yellow-900 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4">
-                          <div className="flex items-center space-x-2">
-                            <AlertTriangle size={20} className="text-yellow-600" />
-                            <h3 className="font-medium text-yellow-800 dark:text-yellow-200">Low Stock Alert</h3>
-                          </div>
-                          <p className="text-yellow-700 dark:text-yellow-300 mt-1">{lowStockItems} product(s) are running low on stock</p>
-                        </div>
-                      )}
-
-                      {pendingInvoices > 0 && (
-                        <div className="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
-                          <div className="flex items-center space-x-2">
-                            <Clock size={20} className="text-blue-600" />
-                            <h3 className="font-medium text-blue-800 dark:text-blue-200">Pending Invoices</h3>
-                          </div>
-                          <p className="text-blue-700 dark:text-blue-300 mt-1">{pendingInvoices} invoice(s) are pending payment</p>
-                        </div>
-                      )}
+                      <p className="text-muted-foreground">No users pending approval</p>
                     </div>
                   )}
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+                <p className="text-muted-foreground">Welcome back! Here's what's happening with your business.</p>
+              </div>
 
-                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-                      <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Sales & Revenue Trend</h3>
-                      <div className="h-64 sm:h-80">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={salesData}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" />
-                            <YAxis />
-                            <RechartsTooltip
-                              formatter={(value: any, name: any) => [
-                                name === "revenue" ? `${currencySymbol}${Number(value).toLocaleString()}` : value,
-                                name === "revenue" ? "Revenue" : "Sales",
-                              ]}
-                            />
-                            <Line type="monotone" dataKey="sales" stroke="#3B82F6" strokeWidth={2} name="sales" />
-                            <Line type="monotone" dataKey="revenue" stroke="#10B981" strokeWidth={2} name="revenue" />
-                          </LineChart>
-                        </ResponsiveContainer>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
+                        <p className="text-2xl font-bold">
+                          {currencySymbol}
+                          {totalRevenue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <div className="p-3 bg-green-100 dark:bg-green-900/20 rounded-lg">
+                        <DollarSign className="h-5 w-5 text-green-600 dark:text-green-400" />
                       </div>
                     </div>
+                  </CardContent>
+                </Card>
 
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-                      <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Product Categories</h3>
-                      <div className="h-64 sm:h-80">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={categoryData}
-                              cx="50%"
-                              cy="50%"
-                              outerRadius={100}
-                              fill="#8884d8"
-                              dataKey="value"
-                              label={({ name, value }) => `${name}: ${value}%`}
-                            >
-                              {categoryData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.color} />
-                              ))}
-                            </Pie>
-                            <RechartsTooltip />
-                          </PieChart>
-                        </ResponsiveContainer>
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-muted-foreground">Products</p>
+                        <p className="text-2xl font-bold">{totalProducts.toLocaleString()}</p>
+                      </div>
+                      <div className="p-3 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
+                        <Package className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                       </div>
                     </div>
-                  </div>
+                  </CardContent>
+                </Card>
 
-                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-                      <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Recent Payments</h3>
-                      <div className="space-y-4">
-                        {recentInvoices.length > 0 ? (
-                          recentInvoices.map((invoice) => (
-                            <div key={invoice.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                              <div>
-                                <p className="font-medium text-gray-800 dark:text-gray-200">{invoice.customerName}</p>
-                                    <p className="text-sm text-gray-600 dark:text-gray-400">Invoice #{invoice.id.slice(-8)}</p>
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-muted-foreground">Invoices</p>
+                        <p className="text-2xl font-bold">{totalInvoices.toLocaleString()}</p>
+                      </div>
+                      <div className="p-3 bg-purple-100 dark:bg-purple-900/20 rounded-lg">
+                        <FileText className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-muted-foreground">Quick Sales</p>
+                        <p className="text-2xl font-bold">{totalSales.toLocaleString()}</p>
+                      </div>
+                      <div className="p-3 bg-green-100 dark:bg-green-900/20 rounded-lg">
+                        <ShoppingCart className="h-5 w-5 text-green-600 dark:text-green-400" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-muted-foreground">Staff Members</p>
+                        <p className="text-2xl font-bold">{totalStaff.toLocaleString()}</p>
+                      </div>
+                      <div className="p-3 bg-orange-100 dark:bg-orange-900/20 rounded-lg">
+                        <Users className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {(lowStockItems > 0 || pendingInvoices > 0) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {lowStockItems > 0 && (
+                    <Alert
+                      variant="default"
+                      className="border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20 dark:border-yellow-900"
+                    >
+                      <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                      <AlertTitle className="text-yellow-800 dark:text-yellow-200">Low Stock Alert</AlertTitle>
+                      <AlertDescription className="text-yellow-700 dark:text-yellow-300">
+                        {lowStockItems} product(s) are running low on stock
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {pendingInvoices > 0 && (
+                    <Alert
+                      variant="default"
+                      className="border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-900"
+                    >
+                      <Clock className="h-4 w-4 text-blue-600" />
+                      <AlertTitle className="text-blue-800 dark:text-blue-200">Pending Invoices</AlertTitle>
+                      <AlertDescription className="text-blue-700 dark:text-blue-300">
+                        {pendingInvoices} invoice(s) are pending payment
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5 text-primary" />
+                      Sales & Revenue Trend
+                    </CardTitle>
+                    <CardDescription>Last 6 months performance overview</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-64 sm:h-80">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={salesData}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                          <XAxis dataKey="name" className="text-xs" tick={{ fill: "hsl(var(--muted-foreground))" }} />
+                          <YAxis className="text-xs" tick={{ fill: "hsl(var(--muted-foreground))" }} />
+                          <RechartsTooltip
+                            contentStyle={{
+                              backgroundColor: "hsl(var(--card))",
+                              border: "1px solid hsl(var(--border))",
+                              borderRadius: "8px",
+                            }}
+                            formatter={(value: any, name: any) => [
+                              name === "revenue" ? `${currencySymbol}${Number(value).toLocaleString()}` : value,
+                              name === "revenue" ? "Revenue" : "Sales",
+                            ]}
+                          />
+                          <Line type="monotone" dataKey="sales" stroke="#3B82F6" strokeWidth={2} name="sales" />
+                          <Line type="monotone" dataKey="revenue" stroke="#10B981" strokeWidth={2} name="revenue" />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Activity className="h-5 w-5 text-primary" />
+                      Product Categories
+                    </CardTitle>
+                    <CardDescription>Distribution by category value</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-64 sm:h-80">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={categoryData}
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={100}
+                            fill="#8884d8"
+                            dataKey="value"
+                            label={({ name, value }) => `${name}: ${value}%`}
+                          >
+                            {categoryData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <RechartsTooltip
+                            contentStyle={{
+                              backgroundColor: "hsl(var(--card))",
+                              border: "1px solid hsl(var(--border))",
+                              borderRadius: "8px",
+                            }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Recent Payments</CardTitle>
+                    <CardDescription>Latest paid invoices</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {recentInvoices.length > 0 ? (
+                        recentInvoices.map((invoice, index) => (
+                          <div key={invoice.id}>
+                            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-10 w-10">
+                                  <AvatarFallback className="bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400">
+                                    <DollarSign className="h-5 w-5" />
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <p className="font-medium">{invoice.customerName}</p>
+                                  <p className="text-sm text-muted-foreground">Invoice #{invoice.id.slice(-8)}</p>
+                                </div>
                               </div>
                               <div className="text-right">
-                                <p className="font-semibold text-green-600">
+                                <p className="font-semibold text-green-600 dark:text-green-400">
                                   {currencySymbol}
-                                  {invoice.total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  {invoice.total.toLocaleString("en-US", {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
                                 </p>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">
+                                <p className="text-sm text-muted-foreground">
                                   {format(new Date(invoice.createdAt), "MMM dd")}
                                 </p>
                               </div>
                             </div>
-                          ))
-                        ) : (
-                          <p className="text-gray-600 dark:text-gray-400 text-center py-4">No recent payments</p>
-                        )}
-                      </div>
+                            {index < recentInvoices.length - 1 && <Separator className="my-2" />}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-8 text-center">
+                          <div className="rounded-full bg-muted p-4 mb-4">
+                            <FileText className="h-8 w-8 text-muted-foreground" />
+                          </div>
+                          <p className="text-muted-foreground">No recent payments</p>
+                        </div>
+                      )}
                     </div>
+                  </CardContent>
+                </Card>
 
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-                      <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Recent Products</h3>
-                      <div className="space-y-4">
-                        {recentProducts.length > 0 ? (
-                          recentProducts.map((product) => (
-                            <div key={product.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                              <div className="flex items-center space-x-3">
-                                <img
-                                  src={product.images?.[0]?.url || "https://images.pexels.com/photos/3394659/pexels-photo-3394659.jpeg?auto=compress&cs=tinysrgb&w=50"}
-                                  alt={product.name}
-                                  className="w-10 h-10 rounded-lg object-cover"
-                                />
-                                  <div>
-                                    <p className="font-medium text-gray-800 dark:text-gray-200 truncate">{product.name}</p>
-                                    <p className="text-sm text-gray-600 dark:text-gray-400">{product.categoryId || "Uncategorized"}</p>
-                                  </div>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Recent Products</CardTitle>
+                    <CardDescription>Newly added inventory</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {recentProducts.length > 0 ? (
+                        recentProducts.map((product, index) => (
+                          <div key={product.id}>
+                            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-10 w-10 rounded-lg">
+                                  <AvatarImage
+                                    src={
+                                      product.images?.[0]?.url ||
+                                      "https://images.pexels.com/photos/3394659/pexels-photo-3394659.jpeg?auto=compress&cs=tinysrgb&w=50" ||
+                                      "/placeholder.svg"
+                                    }
+                                    alt={product.name}
+                                    className="object-cover"
+                                  />
+                                  <AvatarFallback className="rounded-lg">
+                                    <Package className="h-5 w-5" />
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="min-w-0">
+                                  <p className="font-medium truncate">{product.name}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {product.categoryId || "Uncategorized"}
+                                  </p>
+                                </div>
                               </div>
                               <div className="text-right">
-                                <p className="font-semibold text-blue-600">
+                                <p className="font-semibold text-primary">
                                   {currencySymbol}
-                                  {product.price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  {product.price.toLocaleString("en-US", {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
                                 </p>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">{product.stock} in stock</p>
+                                <Badge variant="secondary" className="text-xs">
+                                  {product.stock} in stock
+                                </Badge>
                               </div>
                             </div>
-                          ))
-                        ) : (
-                          <p className="text-gray-600 dark:text-gray-400 text-center py-4">No products added yet</p>
-                        )}
-                      </div>
+                            {index < recentProducts.length - 1 && <Separator className="my-2" />}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-8 text-center">
+                          <div className="rounded-full bg-muted p-4 mb-4">
+                            <Package className="h-8 w-8 text-muted-foreground" />
+                          </div>
+                          <p className="text-muted-foreground">No products added yet</p>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                </div>
-              )}
+                  </CardContent>
+                </Card>
+              </div>
             </div>
-          </div>
+          )}
         </div>
+      </div>
+    </div>
   )
 }

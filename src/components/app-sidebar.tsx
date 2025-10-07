@@ -38,9 +38,14 @@ const data = {
   navMain: [
     { title: "Dashboard", url: "/dashboard", icon: LayoutDashboardIcon },
     { title: "Users", url: "/users", icon: UsersIcon },
+    { title: "Products", url: "/products", icon: UsersIcon },
+    { title: "Invoices", url: "/invoices", icon: FileTextIcon },
+    { title: "Supplies", url: "/supplies", icon: UsersIcon },
+    { title: "Reports", url: "/reports", icon: FileIcon },
+    { title: "Notifications", url: "/notifications", icon: UsersIcon },
+    { title: "Settings", url: "/settings", icon: SettingsIcon },
     { title: "Shops", url: "/shops", icon: Building2 },
     { title: "Notifications", url: "/notifications", icon: Bell },
-    { title: "Settings", url: "/settings", icon: Settings },
   ],
 }
 

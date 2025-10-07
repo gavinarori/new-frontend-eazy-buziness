@@ -127,9 +127,9 @@ const Register: React.FC = () => {
     </div>
     <div className="bg-muted relative hidden lg:block">
       <img
-        src="/placeholder.svg"
+        src="https://github.com/gavinarori/new-frontend-eazy-buziness/blob/main/src/assests/black-girl-mask-buy-food.jpg?raw=true"
         alt="Image"
-        className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+        className="absolute inset-0 h-full w-full object-cover  dark:grayscale"
       />
     </div>
   </div>

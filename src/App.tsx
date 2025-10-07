@@ -73,7 +73,7 @@ const AppRoutes: React.FC = () => {
 function App() {
   return (
     <Router>
-      <ThemeProvider>
+      <ThemeProvider  defaultTheme="dark" storageKey="vite-ui-theme">
         <AuthProvider>
           <ToastProvider>
             <DialogProvider>
