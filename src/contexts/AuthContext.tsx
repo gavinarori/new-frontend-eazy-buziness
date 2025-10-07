@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useAuth as useApiAuth } from '../hooks/useApi';
-import { User } from '../services/apiClient';
+import { User, shopsApi, Shop } from '../services/apiClient';
 
 interface AuthContextType {
   currentUser: User | null;
   userData: User | null;
+  shop: Shop | null;
   login: (email: string, password: string) => Promise<User>;
   logout: () => Promise<void>;
   loading: boolean;
@@ -23,10 +24,36 @@ export const useAuth = () => {
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading, error, login: apiLogin, logout: apiLogout } = useApiAuth();
+  const [shop, setShop] = useState<Shop | null>(null);
 
   const login = async (email: string, password: string) => {
-    return await apiLogin({ email, password });
+    const u = await apiLogin({ email, password });
+    // attempt to load shop if any
+    try {
+      const all = await shopsApi.getAll();
+      const mine = all.shops.find((s) => s.ownerId === u.id) || null;
+      setShop(mine ?? null);
+    } catch {}
+    return u;
   };
+
+  // When user changes (e.g., from me() on app load), try to load the associated shop
+  useEffect(() => {
+    const loadShop = async () => {
+      if (!user) {
+        setShop(null);
+        return;
+      }
+      try {
+        const all = await shopsApi.getAll();
+        const mine = all.shops.find((s) => s.ownerId === user.id) || null;
+        setShop(mine ?? null);
+      } catch {
+        setShop(null);
+      }
+    };
+    loadShop();
+  }, [user]);
 
   const logout = async () => {
     await apiLogout();
@@ -35,6 +62,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const value = {
     currentUser: user,
     userData: user,
+    shop,
     login,
     logout,
     loading,
