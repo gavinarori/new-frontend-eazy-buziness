@@ -5,8 +5,9 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: 'super_admin' | 'shop_admin' | 'staff';
+  role: 'customer' | 'seller' | 'admin' | 'superadmin';
   shopId?: string;
+  isActive?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -130,7 +131,7 @@ export const authApi = {
   login: (credentials: { email: string; password: string }) =>
     apiPost<{ user: User }>('/auth/login', credentials),
   
-  register: (userData: { email: string; password: string; name: string; role?: string }) =>
+  register: (userData: { email: string; password: string; name: string; role?: 'customer' | 'seller' | 'admin' | 'superadmin' }) =>
     apiPost<{ user: User }>('/auth/register', userData),
   
   me: () => apiGet<{ user: User }>('/auth/me'),
@@ -144,7 +145,7 @@ export const shopsApi = {
   
   getById: (id: string) => apiGet<{ shop: Shop }>(`/shops/${id}`),
   
-  create: (shopData: { name: string; description?: string }) =>
+  create: (shopData: { name: string; description?: string; address?: string; phone?: string; currency?: string; vatRate?: number }) =>
     apiPost<{ shop: Shop }>('/shops', shopData),
   
   update: (id: string, shopData: Partial<Shop>) =>
@@ -245,6 +246,14 @@ export const notificationsApi = {
   markAllAsRead: () => apiPost('/notifications/read-all'),
   
   delete: (id: string) => apiDelete(`/notifications/${id}`),
+};
+
+// Users API (admin only)
+export const usersApi = {
+  getAll: () => apiGet<{ users: User[] }>(`/users`),
+  getById: (id: string) => apiGet<{ user: User }>(`/users/${id}`),
+  update: (id: string, userData: Partial<User>) => apiPatch<{ user: User }>(`/users/${id}`, userData),
+  delete: (id: string) => apiDelete(`/users/${id}`),
 };
 
 // Orders API

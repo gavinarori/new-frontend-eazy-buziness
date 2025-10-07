@@ -27,7 +27,7 @@ const Dashboard: React.FC = () => {
   const loading = productsLoading || invoicesLoading || salesLoading || usersLoading;
 
   // Get current shop data for currency
-  const currentShop = allShops.find(shop => shop.id === currentShopId);
+  const currentShop = allShops?.find(shop => shop.id === currentShopId);
   const currency = currentShop?.currency || 'USD';
 
   // Currency symbol mapping
@@ -45,10 +45,10 @@ const Dashboard: React.FC = () => {
   const currencySymbol = getCurrencySymbol(currency);
 
   // Super Admin specific data - for business management only
-  const pendingShops = allShops.filter(shop => !shop.isActive);
-  const activeShops = allShops.filter(shop => shop.isActive);
-  const pendingUsers = allUsers.filter(user => !user.isActive);
-  const activeUsers = allUsers.filter(user => user.isActive);
+  const pendingShops = allShops?.filter(shop => !shop.isActive);
+  const activeShops = allShops?.filter(shop => shop.isActive);
+  const pendingUsers = allUsers?.filter(user => !user.isActive);
+  const activeUsers = allUsers?.filter(user => user.isActive);
 
   // Regular dashboard data (for shop admins and staff)
   const salesData = useMemo(() => {
@@ -63,19 +63,19 @@ const Dashboard: React.FC = () => {
       const monthStart = startOfMonth(month);
       const monthEnd = endOfMonth(month);
       
-      const monthInvoices = invoices.filter(invoice => {
-        const invoiceDate = invoice.createdAt instanceof Date ? invoice.createdAt : new Date(invoice.createdAt);
+      const monthInvoices = invoices?.filter(invoice => {
+        const invoiceDate = invoice?.createdAt instanceof Date ? invoice.createdAt : new Date(invoice.createdAt);
         return invoiceDate >= monthStart && invoiceDate <= monthEnd;
       });
 
-      const monthSales = sales.filter(sale => {
-        const saleDate = sale.createdAt instanceof Date ? sale.createdAt : new Date(sale.createdAt);
+      const monthSales = sales?.filter(sale => {
+        const saleDate = sale?.createdAt instanceof Date ? sale.createdAt : new Date(sale.createdAt);
         return saleDate >= monthStart && saleDate <= monthEnd;
       });
 
-      const totalSales = monthInvoices.length + monthSales.length;
-      const totalRevenue = monthInvoices.reduce((sum, invoice) => sum + invoice.total, 0) + 
-                          monthSales.reduce((sum, sale) => sum + sale.total, 0);
+      const totalSales = monthInvoices?.length + monthSales?.length;
+      const totalRevenue = monthInvoices?.reduce((sum, invoice) => sum + invoice.total, 0) + 
+                          monthSales?.reduce((sum, sale) => sum + sale.total, 0);
 
       return {
         name: format(month, 'MMM'),
@@ -88,8 +88,8 @@ const Dashboard: React.FC = () => {
   const categoryData = useMemo(() => {
     if (isSuper) return [];
     
-    const categoryStats = products.reduce((acc, product) => {
-      const category = product.category || 'Uncategorized';
+    const categoryStats = products?.reduce((acc, product) => {
+      const category = product?.category || 'Uncategorized';
       if (!acc[category]) {
         acc[category] = { count: 0, value: 0 };
       }
@@ -109,20 +109,20 @@ const Dashboard: React.FC = () => {
   }, [products, isSuper]);
 
   // Regular dashboard metrics - shop-specific
-  const totalRevenue = invoices.reduce((sum, invoice) => sum + invoice.total, 0) + 
-                      sales.reduce((sum, sale) => sum + sale.total, 0);
-  const totalProducts = products.length;
-  const totalInvoices = invoices.length;
-  const totalSales = sales.length;
-  const totalStaff = users.filter(user => user.role === 'staff').length;
-  const lowStockItems = products.filter(product => product.stock <= product.minStock).length;
-  const pendingInvoices = invoices.filter(invoice => invoice.status === 'pending').length;
+  const totalRevenue = invoices?.reduce((sum, invoice) => sum + invoice.total, 0) + 
+                      sales?.reduce((sum, sale) => sum + sale.total, 0);
+  const totalProducts = products?.length;
+  const totalInvoices = invoices?.length;
+  const totalSales = sales?.length;
+  const totalStaff = users?.filter(user => user.role === 'staff').length;
+  const lowStockItems = products?.filter(product => product.stock <= product.minStock).length;
+  const pendingInvoices = invoices?.filter(invoice => invoice.status === 'pending').length;
 
   const recentInvoices = useMemo(() => {
     if (isSuper) return [];
     
     return invoices
-      .filter(invoice => invoice.status === 'paid')
+      ?.filter(invoice => invoice.status === 'paid')
       .sort((a, b) => {
         const dateA = a.paidAt ? (a.paidAt instanceof Date ? a.paidAt : new Date(a.paidAt)) : new Date(0);
         const dateB = b.paidAt ? (b.paidAt instanceof Date ? b.paidAt : new Date(b.paidAt)) : new Date(0);
@@ -135,9 +135,9 @@ const Dashboard: React.FC = () => {
     if (isSuper) return [];
     
     return products
-      .sort((a, b) => {
-        const dateA = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt);
-        const dateB = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt);
+      ?.sort((a, b) => {
+        const dateA = a?.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt);
+        const dateB = b?.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt);
         return dateB.getTime() - dateA.getTime();
       })
       .slice(0, 5);

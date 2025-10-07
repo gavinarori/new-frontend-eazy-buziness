@@ -2,8 +2,17 @@ import React, { useState } from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  FieldSeparator,
+} from "@/components/ui/field"
+
 import { Label } from "@/components/ui/label"
 import { useAuth } from "@/contexts/AuthContext"
+import { useNavigate } from "react-router-dom"
 import { LogIn, Building2, UserPlus } from "lucide-react"
 import { Link } from "react-router-dom"
 
@@ -16,6 +25,7 @@ export function LoginForm({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const { login } = useAuth()
+  const navigate = useNavigate()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -23,7 +33,8 @@ export function LoginForm({
     setError("")
 
     try {
-      await login(email, password)
+      const user = await login(email, password)
+      navigate("/dashboard")
     } catch (err: unknown) {
       if (err instanceof Error) {
         if (err.message.includes("user-not-found")) {
@@ -44,77 +55,71 @@ export function LoginForm({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
-        <div className="bg-white rounded-2xl shadow-xl p-8">
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Building2 size={32} className="text-blue-600" />
-            </div>
-            <h1 className="text-2xl font-bold text-gray-800">BusinessHub</h1>
-            <p className="text-gray-600 mt-2">Sign in to your account</p>
+    <form
+      onSubmit={handleSubmit}
+      className={cn("flex flex-col gap-6", className)}
+      {...props}
+    >
+      <FieldGroup>
+        <div className="flex flex-col items-center gap-1 text-center">
+          <h1 className="text-2xl font-bold">Login to your account</h1>
+          <p className="text-muted-foreground text-sm text-balance">
+            Enter your email below to login to your account
+          </p>
+        </div>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-md">
+            {error}
           </div>
+        )}
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
-              {error}
-            </div>
-          )}
+        <Field>
+          <FieldLabel htmlFor="email">Email</FieldLabel>
+          <Input
+            id="email"
+            type="email"
+            placeholder="m@example.com"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </Field>
 
-          <form onSubmit={handleSubmit} className={cn("space-y-6", className)} {...props}>
-            <div>
-              <Label className="mb-2 block" htmlFor="email">
-                Email Address
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
-                required
-              />
-            </div>
-
-            <div>
-              <Label className="mb-2 block" htmlFor="password">
-                Password
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
-                required
-              />
-            </div>
-
-            <Button type="submit" className="w-full" disabled={loading}>
-              <LogIn size={18} className="mr-2" />
-              {loading ? "Signing in..." : "Sign In"}
-            </Button>
-          </form>
-
-          <div className="mt-4 text-center">
+        <Field>
+          <div className="flex items-center">
+            <FieldLabel htmlFor="password">Password</FieldLabel>
             <Link
-              to="/register"
-              className="text-blue-600 hover:text-blue-700 text-sm font-medium inline-flex items-center justify-center space-x-2"
+              to="/forgot-password"
+              className="ml-auto text-sm underline-offset-4 hover:underline"
             >
-              <UserPlus size={16} className="mr-2" />
-              <span>Don't have an account? Register your business</span>
+              Forgot your password?
             </Link>
           </div>
+          <Input
+            id="password"
+            type="password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </Field>
 
-          <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-            <h3 className="font-medium text-blue-800 mb-2">New to BusinessHub?</h3>
-            <p className="text-sm text-blue-600">
-              Register your business to get started with our comprehensive management system. Your account will be
-              activated once approved by our team.
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
+        <Field>
+          <Button type="submit" disabled={loading || !email || !password}>
+            {loading ? "Signing in..." : "Login"}
+          </Button>
+        </Field>
+
+        <Field>
+          <FieldDescription className="text-center">
+            Don&apos;t have an account?{" "}
+            <Link to="/signup" className="underline underline-offset-4">
+              Sign up
+            </Link>
+          </FieldDescription>
+        </Field>
+      </FieldGroup>
+    </form>
   )
 }
