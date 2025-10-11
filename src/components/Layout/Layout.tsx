@@ -1,5 +1,5 @@
 import type React from "react"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
+import { SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "../app-sidebar"
 import { SiteHeader } from "../site-header"
 
@@ -16,17 +16,23 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         } as React.CSSProperties
       }
     >
-      <AppSidebar />
+      <div className="flex min-h-screen w-full bg-background text-foreground">
+        {/* --- Sidebar (visible on md and up) --- */}
+        <aside className="hidden md:flex w-[var(--sidebar-width)] ">
+          <AppSidebar />
+        </aside>
 
-      <SidebarInset>
-        <div className="flex h-screen flex-col">
+        {/* --- Main Section --- */}
+        <div className="flex flex-1 flex-col min-h-screen">
           <SiteHeader />
 
-          <main className="flex-1 overflow-auto">
-            <div className="container mx-auto p-4 sm:p-6 lg:p-8">{children}</div>
+          <main className="flex-1 overflow-y-auto h-screen ">
+            <div className="container  sm:p-6 lg:p-8">
+              {children}
+            </div>
           </main>
         </div>
-      </SidebarInset>
+      </div>
     </SidebarProvider>
   )
 }
