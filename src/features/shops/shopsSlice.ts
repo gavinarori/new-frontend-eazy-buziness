@@ -3,9 +3,10 @@ import { apiGet } from '../../services/api';
 import type { Shop } from '../../types';
 
 export const fetchShops = createAsyncThunk('shops/fetchAll', async () => {
-  const data = await apiGet<{ items: Shop[] }>(`/shops`);
+  const data = await apiGet<{ shops: Shop[] }>(`/shops`);
+
   // normalize if needed
-  return data.items || (data as unknown as Shop[]);
+  return data.shops || (data as unknown as Shop[]);
 });
 
 interface ShopsState {
