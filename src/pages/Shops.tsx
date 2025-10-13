@@ -63,23 +63,7 @@ const Shops: React.FC = () => {
   };
 
   // Only super admin can access this page
-  if (userData?.role !== 'super_admin') {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800">Shop Management</h1>
-            <p className="mt-1 text-gray-600">Access restricted</p>
-          </div>
-        </div>
-        <div className="text-center py-12">
-          <Store size={48} className="mx-auto text-gray-400 mb-4" />
-          <h3 className="text-lg font-medium text-gray-800 mb-2">Access Restricted</h3>
-          <p className="text-gray-600">You don't have permission to manage shops.</p>
-        </div>
-      </div>
-    );
-  }
+
 
   const onSubmit = async (data: ShopFormData) => {
     setLoading(true);
@@ -87,7 +71,7 @@ const Shops: React.FC = () => {
     
     try {
       if (editingShop) {
-        await shopsApi.update(editingShop.id, {
+        await shopsApi.update(editingShop._id          , {
           name: data.name,
           description: `${data.address} | ${data.phone} | VAT ${data.vatRate}% | ${data.currency}`,
         });
@@ -117,7 +101,8 @@ const Shops: React.FC = () => {
     setError('');
     
     try {
-      await shopsApi.update(editingShop.id, { name: data.name, description: `${data.address} | ${data.phone} | VAT ${data.vatRate}% | ${data.currency}` });
+      await shopsApi.update(editingShop._id
+        , { name: data.name, description: `${data.address} | ${data.phone} | VAT ${data.vatRate}% | ${data.currency}` });
       await dispatch(fetchShops());
       
       showToast({ type: 'success', title: 'Business updated', message: 'The business details were saved successfully.' });
@@ -205,25 +190,40 @@ const Shops: React.FC = () => {
   };
 
   const getShopAdmin = (shop: any) => {
-    return users.find(user => user.shopId === shop.id && user.role === 'shop_admin');
+    return users.find(user => user.shopId === shop._id && user.role === 'shop_admin');
   };
 
-  const filteredShops = shops.filter(shop => {
-    const matchesSearch = shop.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         shop.address.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || 
-                         (statusFilter === 'active' && shop.isActive) ||
-                         (statusFilter === 'inactive' && !shop.isActive) ||
-                         (statusFilter === 'pending' && !shop.isActive);
-    return matchesSearch && matchesStatus;
-  }).sort((a, b) => {
-    const dateA = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt);
-    const dateB = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt);
-    return dateB.getTime() - dateA.getTime();
-  });
+  const filteredShops = Array.isArray(shops)
+  ? shops
+      .filter(shop => {
+        const name = shop?.name?.toLowerCase() || "";
+        const address = shop?.address?.toLowerCase() || "";
+        const matchesSearch =
+          name.includes(searchQuery.toLowerCase()) ||
+          address.includes(searchQuery.toLowerCase());
 
-  const activeShops = shops.filter(shop => shop.isActive).length;
-  const pendingShops = shops.filter(shop => !shop.isActive).length;
+        const matchesStatus =
+          statusFilter === "all" ||
+          (statusFilter === "active" && shop.isActive) ||
+          (statusFilter === "inactive" && !shop.isActive) ||
+          (statusFilter === "pending" && !shop.isActive);
+
+        return matchesSearch && matchesStatus;
+      })
+      .sort((a, b) => {
+        const dateA = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt);
+        const dateB = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt);
+        return dateB.getTime() - dateA.getTime();
+      })
+  : [];
+
+  const shopList = Array.isArray(shops) ? shops : [];
+
+  const activeShops = shopList.filter(shop => shop.status === 'approved').length;
+  const pendingShops = shopList.filter(
+    shop => shop.status === 'pending' || shop.status === 'rejected'
+  ).length;
+  const totalShops = shopList.length;
   const totalUsers = users.filter(user => shops.some(shop => shop.id === user.shopId)).length;
 
   if (shopsLoading) {
@@ -256,7 +256,7 @@ const Shops: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Total Businesses</p>
-              <p className="text-2xl font-bold text-gray-800">{shops.length}</p>
+              <p className="text-2xl font-bold text-blue-600">{totalShops}</p>
             </div>
             <div className="p-3 bg-blue-100 rounded-lg">
               <Building2 size={24} className="text-blue-600" />
@@ -357,7 +357,7 @@ const Shops: React.FC = () => {
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {filteredShops.map(shop => {
                 const admin = getShopAdmin(shop);
-                const userCount = users.filter(user => user.shopId === shop.id).length;
+                const userCount = users.filter(user => user.shopId === shop._id).length;
                 
                 return (
                   <tr key={shop.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/60 transition-colors">
@@ -390,22 +390,28 @@ const Shops: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center space-x-2">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          shop.isActive ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
-                        }`}>
-                          {shop.isActive ? 'Active' : 'Pending'}
-                        </span>
-                        <button
-                          onClick={() => toggleShopStatus(shop.id, shop.isActive)}
-                          className={`p-1 rounded transition-colors ${
-                            shop.isActive 
-                              ? 'text-green-600 hover:text-green-800' 
-                              : 'text-orange-600 hover:text-orange-800'
-                          }`}
-                          title={shop.isActive ? 'Deactivate business' : 'Activate business'}
-                        >
-                          {shop.isActive ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
-                        </button>
+                      <span
+  className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+    shop.status === 'approved'
+      ? 'bg-green-100 text-green-800'
+      : 'bg-red-100 text-red-800'
+  }`}
+>
+  {shop.status === 'approved' ? 'Approved' : 'Pending'}
+</span>
+
+<button
+  onClick={() => toggleShopStatus(shop._id, shop.status === 'approved')}
+  className={`p-1 rounded transition-colors ${
+    shop.status === 'approved'
+      ? 'text-green-600 hover:text-green-800'
+      : 'text-red-600 hover:text-red-800'
+  }`}
+  title={shop.status === 'approved' ? 'Reject business' : 'Approve business'}
+>
+  {shop.status === 'approved' ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+</button>
+
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
