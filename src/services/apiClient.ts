@@ -16,10 +16,12 @@ export interface Shop {
   id: string;
   name: string;
   description?: string;
-  ownerId: string;
-  status: 'pending' | 'approved' | 'rejected';
-  approvedBy?: string;
-  approvedAt?: string;
+  address?: string;
+  phone?: string;
+  currency?: string;
+  vatRate?: number;
+  isActive?: boolean;
+  status?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -31,7 +33,9 @@ export interface Product {
   sku?: string;
   barcode?: string;
   price: number;
+  cost?: number;
   stock: number;
+  minStock?: number;
   shopId: string;
   categoryId?: string;
   images: Array<{
@@ -145,7 +149,7 @@ export const shopsApi = {
   
   getById: (id: string) => apiGet<{ shop: Shop }>(`/shops/${id}`),
   
-  create: (shopData: { name: string; description?: string; address?: string; phone?: string; currency?: string; vatRate?: number }) =>
+  create: (shopData: { name: string; description?: string; address?: string; phone?: string; currency?: string; vatRate?: number; status?: string }) =>
     apiPost<{ shop: Shop }>('/shops', shopData),
   
   update: (id: string, shopData: Partial<Shop>) =>
@@ -167,11 +171,9 @@ export const productsApi = {
   
   getById: (id: string) => apiGet<{ product: Product }>(`/products/${id}`),
   
-  create: (productData: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) =>
-    apiPost<{ product: Product }>('/products', productData),
+  create: (formData: FormData) => apiPost<{ product: Product }>(`/products`, formData),
   
-  update: (id: string, productData: Partial<Product>) =>
-    apiPatch<{ product: Product }>(`/products/${id}`, productData),
+  update: (id: string, formData: FormData) => apiPatch<{ product: Product }>(`/products/${id}`, formData),
   
   delete: (id: string) => apiDelete(`/products/${id}`),
 };
@@ -186,7 +188,7 @@ export const invoicesApi = {
   getById: (id: string) => apiGet<{ invoice: Invoice }>(`/invoices/${id}`),
   
   create: (invoiceData: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'>) =>
-    apiPost<{ invoice: Invoice }>('/invoices', invoiceData),
+    apiPost<{ invoice: Invoice }>(('/invoices'), invoiceData),
   
   update: (id: string, invoiceData: Partial<Invoice>) =>
     apiPatch<{ invoice: Invoice }>(`/invoices/${id}`, invoiceData),

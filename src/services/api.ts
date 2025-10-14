@@ -13,11 +13,15 @@ export async function apiGet<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export async function apiPost<T>(path: string, body?: any, init?: RequestInit): Promise<T> {
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
+  const headers = isFormData
+    ? (init?.headers || {})
+    : { 'Content-Type': 'application/json', ...(init?.headers || {}) };
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
-    body: body ? JSON.stringify(body) : undefined,
+    headers,
+    body: body ? (isFormData ? body : JSON.stringify(body)) : undefined,
     ...init,
   });
   if (!res.ok) {
@@ -28,11 +32,15 @@ export async function apiPost<T>(path: string, body?: any, init?: RequestInit): 
 }
 
 export async function apiPatch<T>(path: string, body?: any, init?: RequestInit): Promise<T> {
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
+  const headers = isFormData
+    ? (init?.headers || {})
+    : { 'Content-Type': 'application/json', ...(init?.headers || {}) };
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'PATCH',
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
-    body: body ? JSON.stringify(body) : undefined,
+    headers,
+    body: body ? (isFormData ? body : JSON.stringify(body)) : undefined,
     ...init,
   });
   if (!res.ok) {

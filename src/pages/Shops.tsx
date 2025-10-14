@@ -68,55 +68,98 @@ const Shops: React.FC = () => {
   const onSubmit = async (data: ShopFormData) => {
     setLoading(true);
     setError('');
-    
+  
     try {
       if (editingShop) {
-        await shopsApi.update(editingShop._id          , {
+        await shopsApi.update(editingShop._id, {
           name: data.name,
+          address: data.address as any,
+          phone: data.phone,
+          vatRate: Number(data.vatRate),
+          currency: data.currency,
+          isActive: data.isActive,
+          status: editingShop.status || 'approved', // preserve status if backend expects it
           description: `${data.address} | ${data.phone} | VAT ${data.vatRate}% | ${data.currency}`,
         });
         await dispatch(fetchShops());
-        showToast({ type: 'success', title: 'Business updated', message: 'The business details were saved successfully.' });
+        showToast({
+          type: 'success',
+          title: 'Business updated',
+          message: 'The business details were saved successfully.',
+        });
         setEditingShop(null);
         setShowEditModal(false);
       } else {
-        await shopsApi.create({ name: data.name, description: `${data.address} | ${data.phone} | VAT ${data.vatRate}% | ${data.currency}` });
+        await shopsApi.create({
+          name: data.name,
+          address: data.address,
+          phone: data.phone,
+          vatRate: Number(data.vatRate),
+          currency: data.currency,
+          status: 'approved',
+          description: `${data.address} | ${data.phone} | VAT ${data.vatRate}% | ${data.currency}`,
+        });
         await dispatch(fetchShops());
-        showToast({ type: 'success', title: 'Business created', message: 'The business has been added.' });
+        showToast({
+          type: 'success',
+          title: 'Business created',
+          message: 'The business has been added.',
+        });
         setShowAddModal(false);
       }
-      
+  
       reset();
     } catch (err) {
       console.error('Error saving shop:', err);
       setError('Failed to save shop. Please try again.');
-      showToast({ type: 'error', title: 'Save failed', message: 'Could not save the business. Try again.' });
+      showToast({
+        type: 'error',
+        title: 'Save failed',
+        message: 'Could not save the business. Try again.',
+      });
     } finally {
       setLoading(false);
     }
   };
-
+  
   const onEditSubmit = async (data: ShopFormData) => {
     setLoading(true);
     setError('');
-    
+  
     try {
-      await shopsApi.update(editingShop._id
-        , { name: data.name, description: `${data.address} | ${data.phone} | VAT ${data.vatRate}% | ${data.currency}` });
+      await shopsApi.update(editingShop._id, {
+        name: data.name,
+        address: data.address ,
+        phone: data.phone,
+        vatRate: Number(data.vatRate),
+        currency: data.currency,
+        isActive: data.isActive,
+        status: editingShop.status || 'approved',
+        description: `${data.address} | ${data.phone} | VAT ${data.vatRate}% | ${data.currency}`,
+      });
       await dispatch(fetchShops());
-      
-      showToast({ type: 'success', title: 'Business updated', message: 'The business details were saved successfully.' });
+  
+      showToast({
+        type: 'success',
+        title: 'Business updated',
+        message: 'The business details were saved successfully.',
+      });
       resetEdit();
       setShowEditModal(false);
       setEditingShop(null);
     } catch (err) {
       console.error('Error updating shop:', err);
       setError('Failed to update shop. Please try again.');
-      showToast({ type: 'error', title: 'Update failed', message: 'Could not update the business.' });
+      showToast({
+        type: 'error',
+        title: 'Update failed',
+        message: 'Could not update the business.',
+      });
     } finally {
       setLoading(false);
     }
   };
+  
 
   const handleEditShop = (shop: any) => {
     setEditingShop(shop);
@@ -327,16 +370,6 @@ const Shops: React.FC = () => {
               className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="all">All Status</option>
-            <option value="active">Active</option>
-            <option value="pending">Pending Onboarding</option>
-            <option value="inactive">Inactive</option>
-          </select>
         </div>
       </div>
 
@@ -435,7 +468,7 @@ const Shops: React.FC = () => {
                           <Edit size={16} />
                         </button>
                         <button 
-                          onClick={() => handleDeleteShop(shop.id)}
+                          onClick={() => handleDeleteShop(shop._id)}
                           className="p-2 text-gray-400 hover:text-red-600 transition-colors"
                           title="Delete business"
                         >
