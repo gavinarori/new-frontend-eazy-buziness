@@ -3,10 +3,21 @@ import { apiGet } from '../../services/api';
 
 export interface Category { id: string; name: string; shopId?: string }
 
-export const fetchCategories = createAsyncThunk('categories/fetchAll', async () => {
-  const data = await apiGet<{ items: Category[] }>(`/categories`);
-  return data.items || (data as unknown as Category[]);
+export const fetchCategories = createAsyncThunk('categories/fetchAll', async (shopId?: string) => {
+  const qs = shopId ? `?shopId=${encodeURIComponent(shopId)}` : '';
+  const data = await apiGet<{ categories: any[] }>(`/categories${qs}`);
+
+  // Map MongoDB _id → id for frontend consistency
+  return data.categories.map(cat => ({
+    id: cat._id,
+    name: cat.name,
+    slug: cat.slug,
+    shopId: cat.shopId,
+    createdAt: cat.createdAt,
+    updatedAt: cat.updatedAt,
+  }));
 });
+
 
 interface CategoriesState {
   items: Category[];

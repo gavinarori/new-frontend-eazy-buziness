@@ -4,6 +4,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { Plus, Search, Edit, Trash2, Package, AlertCircle, Save, X, Tag } from "lucide-react"
 import { useForm } from "react-hook-form"
+import { Controller } from "react-hook-form";
 import { useAuth } from "../contexts/AuthContext"
 import { useDialog } from "../contexts/DialogContext"
 import { useToast } from "../contexts/ToastContext"
@@ -60,7 +61,8 @@ const Products: React.FC = () => {
   const [categoryError, setCategoryError] = useState("")
   const [imagePreview, setImagePreview] = useState<string>("")
   const [imageUploading, setImageUploading] = useState(false)
-
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  
   const products = useAppSelector((s) => s.products.items)
   const productsLoading = useAppSelector((s) => s.products.loading)
   const categories = useAppSelector((s) => s.categories.items) || []
@@ -68,12 +70,13 @@ const Products: React.FC = () => {
 
   useEffect(() => {
     dispatch(fetchProducts({ shopId: userData?.shopId } as any))
-    dispatch(fetchCategories())
+    dispatch(fetchCategories(userData?.shopId))
   }, [dispatch, userData?.shopId])
 
   const {
     register,
     handleSubmit,
+    control,
     reset,
     formState: { errors },
   } = useForm<ProductFormData>()
@@ -110,6 +113,7 @@ const Products: React.FC = () => {
 
       setImageUploading(true)
       try {
+        setImageFile(file)
         const base64 = await convertToBase64(file)
         setImagePreview(base64)
         setError("")
@@ -122,47 +126,48 @@ const Products: React.FC = () => {
   }
 
   const onSubmit = async (data: ProductFormData) => {
-    setLoading(true)
-    setError("")
-
+    setLoading(true);
+    setError("");
+  
     try {
-      const imageUrl =
-        imagePreview ||
-        "https://images.pexels.com/photos/3394659/pexels-photo-3394659.jpeg?auto=compress&cs=tinysrgb&w=400"
-
-      const productData = {
-        name: data.name,
-        description: data.description,
-        sku: data.sku,
-        price: Number(data.price),
-        stock: Number(data.stock),
-        images: [{ url: imageUrl, publicId: "" }],
-        shopId: userData?.shopId || "default",
-        categoryId: data.category || undefined,
-      } as any
-
-      if (editingProduct) {
-        await productsApi.update(editingProduct.id, productData)
-        await dispatch(fetchProducts({ shopId: userData?.shopId } as any))
-        showToast({ type: "success", title: "Product updated", message: "Product details saved successfully." })
-      } else {
-        await productsApi.create(productData)
-        await dispatch(fetchProducts({ shopId: userData?.shopId } as any))
-        showToast({ type: "success", title: "Product added", message: "New product has been added." })
+      const formData = new FormData();
+      formData.append("name", data.name);
+      formData.append("description", data.description);
+      formData.append("sku", data.sku);
+      formData.append("price", String(data.price ?? 0));
+      formData.append("cost", String(data.cost ?? 0));
+      formData.append("stock", String(data.stock ?? 0));
+      formData.append("minStock", String(data.minStock ?? 0));
+      formData.append("shopId", userData?.shopId || "default");
+      formData.append("categoryId", data.category || "");
+  
+      if (imageFile) {
+        formData.append("image", imageFile);
       }
-
-      reset()
-      setShowAddModal(false)
-      setEditingProduct(null)
-      setImagePreview("")
+  
+      if (editingProduct) {
+        await productsApi.update(editingProduct.id, formData);
+        showToast({ type: "success", title: "Product updated", message: "Product details saved successfully." });
+      } else {
+        await productsApi.create(formData);
+        showToast({ type: "success", title: "Product added", message: "New product has been added." });
+      }
+  
+      await dispatch(fetchProducts({ shopId: userData?.shopId } as any));
+      reset();
+      setShowAddModal(false);
+      setEditingProduct(null);
+      setImagePreview("");
+      setImageFile(null);
     } catch (err) {
-      console.error("Error saving product:", err)
-      setError("Failed to save product. Please try again.")
-      showToast({ type: "error", title: "Save failed", message: "Could not save product. Try again." })
+      console.error("Error saving product:", err);
+      setError("Failed to save product. Please try again.");
+      showToast({ type: "error", title: "Save failed", message: "Could not save product. Try again." });
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
+  
 
   const onCategorySubmit = async (data: CategoryFormData) => {
     setCategoryLoading(true)
@@ -170,7 +175,7 @@ const Products: React.FC = () => {
 
     try {
       await categoriesApi.create({ name: data.name, shopId: userData?.shopId || "default" } as any)
-      await dispatch(fetchCategories())
+      await dispatch(fetchCategories(userData?.shopId))
 
       showToast({ type: "success", title: "Category added", message: "New category has been added." })
       resetCategory()
@@ -186,7 +191,8 @@ const Products: React.FC = () => {
 
   const handleEdit = (product: any) => {
     setEditingProduct(product)
-    setImagePreview(product.images?.[0] || product.image || "")
+    setImagePreview(product.images?.[0]?.url || product.image || "")
+    setImageFile(null)
     reset({
       name: product.name,
       description: product.description,
@@ -242,7 +248,7 @@ const Products: React.FC = () => {
     if (ok) {
       try {
         await categoriesApi.delete(categoryId)
-        await dispatch(fetchCategories())
+        await dispatch(fetchCategories(userData?.shopId))
         showToast({ type: "success", title: "Category deleted", message: "The category has been removed." })
       } catch (err) {
         console.error("Error deleting category:", err)
@@ -357,7 +363,7 @@ const Products: React.FC = () => {
             <div className="text-2xl font-bold text-purple-600">
               $
               {products
-                .reduce((sum, product) => sum + product.stock * product.cost, 0)
+                .reduce((sum, product) => sum + product.stock * (product.cost ?? 0), 0)
                 .toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
           </CardContent>
@@ -390,7 +396,7 @@ const Products: React.FC = () => {
     </SelectItem>
   ))
 ) : (
-  <SelectItem disabled>No categories</SelectItem>
+  <SelectItem disabled value="no-categories">No categories</SelectItem>
 )}
 
               </SelectContent>
@@ -406,7 +412,7 @@ const Products: React.FC = () => {
             <div className="relative">
               <img
                 src={
-                  product.images?.[0] ||
+                  product.images?.[0]?.url ||
                   "https://images.pexels.com/photos/3394659/pexels-photo-3394659.jpeg?auto=compress&cs=tinysrgb&w=200" } 
                 alt={product.name}
                 className="w-full h-48 object-cover"
@@ -485,161 +491,189 @@ const Products: React.FC = () => {
 
       {/* Add/Edit Product Dialog */}
       <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingProduct ? "Edit Product" : "Add New Product"}</DialogTitle>
-            <DialogDescription>
-              {editingProduct ? "Update product information" : "Add a new product to your inventory"}
-            </DialogDescription>
-          </DialogHeader>
+  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+    <DialogHeader>
+      <DialogTitle>{editingProduct ? "Edit Product" : "Add New Product"}</DialogTitle>
+      <DialogDescription>
+        {editingProduct ? "Update product information" : "Add a new product to your inventory"}
+      </DialogDescription>
+    </DialogHeader>
 
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+    {error && (
+      <Alert variant="destructive">
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
+    )}
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Product Name</Label>
-                <Input
-                  id="name"
-                  {...register("name", { required: "Product name is required" })}
-                  placeholder="Enter product name"
-                />
-                {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="sku">SKU</Label>
-                <Input id="sku" {...register("sku", { required: "SKU is required" })} placeholder="Enter SKU" />
-                {errors.sku && <p className="text-sm text-destructive">{errors.sku.message}</p>}
-              </div>
-            </div>
+    <form
+      onSubmit={handleSubmit(onSubmit)}
+      className="space-y-4"
+    >
+      {/* Product name and SKU */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="name">Product Name</Label>
+          <Input
+            id="name"
+            {...register("name", { required: "Product name is required" })}
+            placeholder="Enter product name"
+          />
+          {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                {...register("description")}
-                placeholder="Enter product description"
-                rows={3}
-              />
-            </div>
+        <div className="space-y-2">
+          <Label htmlFor="sku">SKU</Label>
+          <Input
+            id="sku"
+            {...register("sku", { required: "SKU is required" })}
+            placeholder="Enter SKU"
+          />
+          {errors.sku && <p className="text-sm text-destructive">{errors.sku.message}</p>}
+        </div>
+      </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="category">Category</Label>
-                <Select {...register("category", { required: "Category is required" })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((category) => (
+      {/* Description */}
+      <div className="space-y-2">
+        <Label htmlFor="description">Description</Label>
+        <Textarea
+          id="description"
+          {...register("description")}
+          placeholder="Enter product description"
+          rows={3}
+        />
+      </div>
+
+      {/* Category, Price, Cost */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="category">Category</Label>
+
+          {/* ✅ Controlled Select for RHF */}
+          <Controller
+            name="category"
+            control={control}
+            rules={{ required: "Category is required" }}
+            render={({ field }) => (
+              <Select
+                onValueChange={(value) => field.onChange(value)}
+                value={field.value || ""}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.isArray(categories) &&
+                    categories.map((category) => (
                       <SelectItem key={category.id} value={category.id}>
                         {category.name}
                       </SelectItem>
                     ))}
-                  </SelectContent>
-                </Select>
-                {errors.category && <p className="text-sm text-destructive">{errors.category.message}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="price">Price ($)</Label>
-                <Input
-                  id="price"
-                  type="number"
-                  step="0.01"
-                  {...register("price", { required: "Price is required", min: 0 })}
-                  placeholder="0.00"
-                />
-                {errors.price && <p className="text-sm text-destructive">{errors.price.message}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cost">Cost ($)</Label>
-                <Input
-                  id="cost"
-                  type="number"
-                  step="0.01"
-                  {...register("cost", { required: "Cost is required", min: 0 })}
-                  placeholder="0.00"
-                />
-                {errors.cost && <p className="text-sm text-destructive">{errors.cost.message}</p>}
-              </div>
-            </div>
+                </SelectContent>
+              </Select>
+            )}
+          />
+          {errors.category && <p className="text-sm text-destructive">{errors.category.message}</p>}
+        </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="stock">Stock Quantity</Label>
-                <Input
-                  id="stock"
-                  type="number"
-                  {...register("stock", { required: "Stock quantity is required", min: 0 })}
-                  placeholder="0"
-                />
-                {errors.stock && <p className="text-sm text-destructive">{errors.stock.message}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="minStock">Minimum Stock</Label>
-                <Input
-                  id="minStock"
-                  type="number"
-                  {...register("minStock", { required: "Minimum stock is required", min: 0 })}
-                  placeholder="0"
-                />
-                {errors.minStock && <p className="text-sm text-destructive">{errors.minStock.message}</p>}
-              </div>
-            </div>
+        <div className="space-y-2">
+          <Label htmlFor="price">Price ($)</Label>
+          <Input
+            id="price"
+            type="number"
+            step="0.01"
+            {...register("price", { required: "Price is required", min: 0 })}
+            placeholder="0.00"
+          />
+          {errors.price && <p className="text-sm text-destructive">{errors.price.message}</p>}
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="image">Product Image</Label>
-              {imagePreview && (
-                <div className="relative inline-block">
-                  <img
-                    src={imagePreview || "/placeholder.svg"}
-                    alt="Preview"
-                    className="w-32 h-32 object-cover rounded-lg border"
-                  />
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="icon"
-                    className="absolute -top-2 -right-2 h-6 w-6"
-                    onClick={() => setImagePreview("")}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
-              <Input id="image" type="file" accept="image/*" onChange={handleImageChange} disabled={imageUploading} />
-              {imageUploading && <p className="text-sm text-blue-600">Processing image...</p>}
-              <p className="text-sm text-muted-foreground">
-                Upload an image (max 2MB). Supported formats: JPG, PNG, GIF, WebP
-              </p>
-            </div>
+        <div className="space-y-2">
+          <Label htmlFor="cost">Cost ($)</Label>
+          <Input
+            id="cost"
+            type="number"
+            step="0.01"
+            {...register("cost", { required: "Cost is required", min: 0 })}
+            placeholder="0.00"
+          />
+          {errors.cost && <p className="text-sm text-destructive">{errors.cost.message}</p>}
+        </div>
+      </div>
 
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setShowAddModal(false)
-                  setEditingProduct(null)
-                  reset()
-                  setImagePreview("")
-                  setError("")
-                }}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading}>
-                <Save className="mr-2 h-4 w-4" />
-                {loading ? "Saving..." : editingProduct ? "Update Product" : "Add Product"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* Stock */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="stock">Stock Quantity</Label>
+          <Input
+            id="stock"
+            type="number"
+            {...register("stock", { required: "Stock quantity is required", min: 0 })}
+            placeholder="0"
+          />
+          {errors.stock && <p className="text-sm text-destructive">{errors.stock.message}</p>}
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="minStock">Minimum Stock</Label>
+          <Input
+            id="minStock"
+            type="number"
+            {...register("minStock", { required: "Minimum stock is required", min: 0 })}
+            placeholder="0"
+          />
+          {errors.minStock && <p className="text-sm text-destructive">{errors.minStock.message}</p>}
+        </div>
+      </div>
+
+      {/* Image Upload */}
+      <div className="space-y-2">
+        <Label htmlFor="image">Product Image</Label>
+        {imagePreview && (
+          <div className="relative inline-block">
+            <img
+              src={imagePreview || "/placeholder.svg"}
+              alt="Preview"
+              className="w-32 h-32 object-cover rounded-lg border"
+            />
+            <Button
+              type="button"
+              variant="destructive"
+              size="icon"
+              className="absolute -top-2 -right-2 h-6 w-6"
+              onClick={() => { setImagePreview(""); setImageFile(null); }}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+        <Input id="image" type="file" accept="image/*" onChange={handleImageChange} disabled={imageUploading} />
+        {imageUploading && <p className="text-sm text-blue-600">Processing image...</p>}
+        <p className="text-sm text-muted-foreground">
+          Upload an image (max 2MB). Supported formats: JPG, PNG, GIF, WebP
+        </p>
+      </div>
+
+      <DialogFooter>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            setShowAddModal(false);
+            setEditingProduct(null);
+            reset(); // ✅ clears all fields, including category
+            setImagePreview("");
+            setError("");
+          }}
+        >
+          Cancel
+        </Button>
+        <Button type="submit" disabled={loading}>
+          <Save className="mr-2 h-4 w-4" />
+          {loading ? "Saving..." : editingProduct ? "Update Product" : "Add Product"}
+        </Button>
+      </DialogFooter>
+    </form>
+  </DialogContent>
+</Dialog>
 
       {/* Category Management Dialog */}
       <Dialog open={showCategoryModal} onOpenChange={setShowCategoryModal}>
@@ -670,34 +704,44 @@ const Products: React.FC = () => {
           </form>
 
           <div className="space-y-2">
-            <h3 className="font-medium mb-3">Existing Categories</h3>
-            {categories.length === 0 ? (
-              <p className="text-center py-4 text-muted-foreground">
-                No categories found. Add your first category above.
-              </p>
-            ) : (
-              categories.map((category:any) => (
-                <div key={category.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <Tag className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">{category.name}</span>
-                    <span className="text-sm text-muted-foreground">
-                      ({products.filter((p:any) => p.category === category.name).length} products)
-                    </span>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-destructive"
-                    onClick={() => handleDeleteCategory(category.id, category.name)}
-                    title="Delete category"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))
-            )}
-          </div>
+  <h3 className="font-medium mb-3">Existing Categories</h3>
+
+  {Array.isArray(categories) && categories.length === 0 ? (
+    <p className="text-center py-4 text-muted-foreground">
+      No categories found. Add your first category above.
+    </p>
+  ) : (
+    Array.isArray(categories) &&
+    categories.map((category: any) => (
+      <div
+        key={category.id}
+        className="flex items-center justify-between p-3 bg-muted rounded-lg"
+      >
+        <div className="flex items-center gap-3">
+          <Tag className="h-4 w-4 text-muted-foreground" />
+          <span className="font-medium">{category.name}</span>
+          <span className="text-sm text-muted-foreground">
+            (
+            {Array.isArray(products)
+              ? products.filter((p: any) => p.category === category.name).length
+              : 0}{' '}
+            products)
+          </span>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-destructive"
+          onClick={() => handleDeleteCategory(category.id, category.name)}
+          title="Delete category"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
+    ))
+  )}
+</div>
+
         </DialogContent>
       </Dialog>
     </div>

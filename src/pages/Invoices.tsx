@@ -359,7 +359,7 @@ const Invoices: React.FC = () => {
         const dateB = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt)
         return dateB.getTime() - dateA.getTime()
       })
-  }, [sales, searchQuery])
+  }, [ searchQuery])
 
   // Show load more button if we have exactly 50 invoices (the limit)
   useEffect(() => {
