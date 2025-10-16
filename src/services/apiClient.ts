@@ -1,6 +1,17 @@
 import { apiGet, apiPost, apiPatch, apiDelete } from './api';
 
-// Types based on backend models
+const getShopId = (): string | null => {
+  try {
+    const shop = localStorage.getItem('shop');
+    if (!shop) return null;
+    const parsed = JSON.parse(shop);
+    return parsed._id || parsed.id || null;
+  } catch {
+    return null;
+  }
+};
+
+// ====== TYPES ======
 export interface User {
   id: string;
   email: string;
@@ -38,10 +49,7 @@ export interface Product {
   minStock?: number;
   shopId: string;
   categoryId?: string;
-  images: Array<{
-    url: string;
-    publicId: string;
-  }>;
+  images: Array<{ url: string; publicId: string }>;
   ratingAverage: number;
   ratingCount: number;
   createdAt: string;
@@ -52,11 +60,7 @@ export interface Invoice {
   id: string;
   shopId: string;
   customerName: string;
-  items: Array<{
-    description: string;
-    quantity: number;
-    unitPrice: number;
-  }>;
+  items: Array<{ description: string; quantity: number; unitPrice: number }>;
   subtotal: number;
   tax: number;
   total: number;
@@ -105,18 +109,14 @@ export interface Order {
   id: string;
   shopId: string;
   customerName: string;
-  items: Array<{
-    productId: string;
-    quantity: number;
-    unitPrice: number;
-  }>;
+  items: Array<{ productId: string; quantity: number; unitPrice: number }>;
   total: number;
   status: 'pending' | 'completed' | 'cancelled';
   createdAt: string;
   updatedAt: string;
 }
 
-// API Response types
+// ====== RESPONSE TYPES ======
 export interface ApiResponse<T> {
   data: T;
   message?: string;
@@ -130,191 +130,200 @@ export interface PaginatedResponse<T> {
   totalPages: number;
 }
 
-// Auth API
+// ====== AUTH API ======
 export const authApi = {
   login: (credentials: { email: string; password: string }) =>
     apiPost<{ user: User }>('/auth/login', credentials),
-  
-  register: (userData: { email: string; password: string; name: string; role?: 'customer' | 'seller' | 'admin' | 'superadmin' }) =>
-    apiPost<{ user: User }>('/auth/register', userData),
-  
+
+  register: (userData: {
+    email: string;
+    password: string;
+    name: string;
+    role?: 'customer' | 'seller' | 'admin' | 'superadmin';
+  }) => apiPost<{ user: User }>('/auth/register', userData),
+
   me: () => apiGet<{ user: User }>('/auth/me'),
-  
+
   logout: () => apiPost('/auth/logout'),
 };
 
-// Shops API
+// ====== SHOPS API ======
 export const shopsApi = {
   getAll: () => apiGet<{ shops: Shop[] }>('/shops'),
-  
+
   getById: (id: string) => apiGet<{ shop: Shop }>(`/shops/${id}`),
-  
-  create: (shopData: { name: string; description?: string; address?: string; phone?: string; currency?: string; vatRate?: number; status?: string }) =>
-    apiPost<{ shop: Shop }>('/shops', shopData),
-  
+
+  create: (shopData: {
+    name: string;
+    description?: string;
+    address?: string;
+    phone?: string;
+    currency?: string;
+    vatRate?: number;
+    status?: string;
+  }) => apiPost<{ shop: Shop }>('/shops', shopData),
+
   update: (id: string, shopData: Partial<Shop>) =>
     apiPatch<{ shop: Shop }>(`/shops/${id}`, shopData),
-  
+
   delete: (id: string) => apiDelete(`/shops/${id}`),
-  
+
   approve: (id: string) => apiPost<{ shop: Shop }>(`/shops/${id}/approve`),
-  
+
   reject: (id: string) => apiPost<{ shop: Shop }>(`/shops/${id}/reject`),
 };
 
-// Products API
+// ====== PRODUCTS API ======
 export const productsApi = {
-  getAll: (shopId?: string) => {
+  getAll: () => {
+    const shopId = getShopId();
     const params = shopId ? `?shopId=${shopId}` : '';
     return apiGet<{ products: Product[] }>(`/products${params}`);
   },
-  
+
   getById: (id: string) => apiGet<{ product: Product }>(`/products/${id}`),
-  
-  create: (formData: FormData) => apiPost<{ product: Product }>(`/products`, formData),
-  
-  update: (id: string, formData: FormData) => apiPatch<{ product: Product }>(`/products/${id}`, formData),
-  
+
+  create: (formData: FormData) => {
+    const shopId = getShopId();
+    if (shopId) formData.append('shopId', shopId);
+    return apiPost<{ product: Product }>('/products', formData);
+  },
+
+  update: (id: string, formData: FormData) =>
+    apiPatch<{ product: Product }>(`/products/${id}`, formData),
+
   delete: (id: string) => apiDelete(`/products/${id}`),
 };
 
-// Invoices API
+// ====== INVOICES API ======
 export const invoicesApi = {
-  getAll: (shopId?: string) => {
+  getAll: () => {
+    const shopId = getShopId();
     const params = shopId ? `?shopId=${shopId}` : '';
     return apiGet<{ invoices: Invoice[] }>(`/invoices${params}`);
   },
-  
+
   getById: (id: string) => apiGet<{ invoice: Invoice }>(`/invoices/${id}`),
-  
-  create: (invoiceData: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'>) =>
-    apiPost<{ invoice: Invoice }>(('/invoices'), invoiceData),
-  
+
+  create: (invoiceData: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const shopId = getShopId();
+    const data = shopId ? { ...invoiceData, shopId } : invoiceData;
+    return apiPost<{ invoice: Invoice }>('/invoices', data);
+  },
+
   update: (id: string, invoiceData: Partial<Invoice>) =>
     apiPatch<{ invoice: Invoice }>(`/invoices/${id}`, invoiceData),
-  
+
   delete: (id: string) => apiDelete(`/invoices/${id}`),
-  
+
   markAsPaid: (id: string) => apiPost<{ invoice: Invoice }>(`/invoices/${id}/pay`),
 };
 
-// Categories API
+// ====== CATEGORIES API ======
 export const categoriesApi = {
-  getAll: (shopId?: string) => {
+  getAll: () => {
+    const shopId = getShopId();
     const params = shopId ? `?shopId=${shopId}` : '';
     return apiGet<{ categories: Category[] }>(`/categories${params}`);
   },
-  
+
   getById: (id: string) => apiGet<{ category: Category }>(`/categories/${id}`),
-  
-  create: (categoryData: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>) =>
-    apiPost<{ category: Category }>('/categories', categoryData),
-  
+
+  create: (categoryData: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const shopId = getShopId();
+    const data = shopId ? { ...categoryData, shopId } : categoryData;
+    return apiPost<{ category: Category }>('/categories', data);
+  },
+
   update: (id: string, categoryData: Partial<Category>) =>
     apiPatch<{ category: Category }>(`/categories/${id}`, categoryData),
-  
+
   delete: (id: string) => apiDelete(`/categories/${id}`),
 };
 
-// Supplies API
+// ====== SUPPLIES API ======
 export const suppliesApi = {
-  getAll: (shopId?: string) => {
+  getAll: () => {
+    const shopId = getShopId();
     const params = shopId ? `?shopId=${shopId}` : '';
     return apiGet<{ supplies: Supply[] }>(`/supplies${params}`);
   },
-  
+
   getById: (id: string) => apiGet<{ supply: Supply }>(`/supplies/${id}`),
-  
-  create: (supplyData: Omit<Supply, 'id' | 'createdAt' | 'updatedAt'>) =>
-    apiPost<{ supply: Supply }>('/supplies', supplyData),
-  
+
+  create: (supplyData: Omit<Supply, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const shopId = getShopId();
+    const data = shopId ? { ...supplyData, shopId } : supplyData;
+    return apiPost<{ supply: Supply }>('/supplies', data);
+  },
+
   update: (id: string, supplyData: Partial<Supply>) =>
     apiPatch<{ supply: Supply }>(`/supplies/${id}`, supplyData),
-  
+
   delete: (id: string) => apiDelete(`/supplies/${id}`),
 };
 
-// Notifications API
+// ====== NOTIFICATIONS API ======
 export const notificationsApi = {
   getAll: (userId?: string) => {
     const params = userId ? `?userId=${userId}` : '';
     return apiGet<{ notifications: Notification[] }>(`/notifications${params}`);
   },
-  
+
   getById: (id: string) => apiGet<{ notification: Notification }>(`/notifications/${id}`),
-  
+
   markAsRead: (id: string) => apiPatch<{ notification: Notification }>(`/notifications/${id}/read`),
-  
+
   markAllAsRead: () => apiPost('/notifications/read-all'),
-  
+
   delete: (id: string) => apiDelete(`/notifications/${id}`),
 };
 
-// Users API (admin only)
+// ====== USERS API ======
 export const usersApi = {
-  getAll: () => apiGet<{ users: User[] }>(`/users`),
+  getAll: () => apiGet<{ users: User[] }>('/users'),
   getById: (id: string) => apiGet<{ user: User }>(`/users/${id}`),
-  update: (id: string, userData: Partial<User>) => apiPatch<{ user: User }>(`/users/${id}`, userData),
+  update: (id: string, userData: Partial<User>) =>
+    apiPatch<{ user: User }>(`/users/${id}`, userData),
   delete: (id: string) => apiDelete(`/users/${id}`),
 };
 
-// Orders API
+// ====== ORDERS API ======
 export const ordersApi = {
-  getAll: (shopId?: string) => {
+  getAll: () => {
+    const shopId = getShopId();
     const params = shopId ? `?shopId=${shopId}` : '';
     return apiGet<{ orders: Order[] }>(`/orders${params}`);
   },
-  
+
   getById: (id: string) => apiGet<{ order: Order }>(`/orders/${id}`),
-  
-  create: (orderData: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>) =>
-    apiPost<{ order: Order }>('/orders', orderData),
-  
+
+  create: (orderData: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const shopId = getShopId();
+    const data = shopId ? { ...orderData, shopId } : orderData;
+    return apiPost<{ order: Order }>('/orders', data);
+  },
+
   update: (id: string, orderData: Partial<Order>) =>
     apiPatch<{ order: Order }>(`/orders/${id}`, orderData),
-  
+
   delete: (id: string) => apiDelete(`/orders/${id}`),
 };
 
-// Reports API
+// ====== REPORTS API ======
 export const reportsApi = {
-  getDashboard: (shopId?: string) => {
+  getDashboard: () => {
+    const shopId = getShopId();
     const params = shopId ? `?shopId=${shopId}` : '';
-    return apiGet<{
-      totalRevenue: number;
-      totalProducts: number;
-      totalInvoices: number;
-      totalOrders: number;
-      lowStockItems: number;
-      pendingInvoices: number;
-      recentInvoices: Invoice[];
-      recentProducts: Product[];
-      salesData: Array<{
-        name: string;
-        sales: number;
-        revenue: number;
-      }>;
-      categoryData: Array<{
-        name: string;
-        value: number;
-        color: string;
-      }>;
-    }>(`/reports/dashboard${params}`);
+    return apiGet(`/reports/dashboard${params}`);
   },
-  
-  getSalesReport: (shopId?: string, startDate?: string, endDate?: string) => {
+
+  getSalesReport: (startDate?: string, endDate?: string) => {
+    const shopId = getShopId();
     const params = new URLSearchParams();
     if (shopId) params.append('shopId', shopId);
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
-    return apiGet<{
-      totalSales: number;
-      totalRevenue: number;
-      salesByMonth: Array<{
-        month: string;
-        sales: number;
-        revenue: number;
-      }>;
-    }>(`/reports/sales?${params.toString()}`);
+    return apiGet(`/reports/sales?${params.toString()}`);
   },
 };
