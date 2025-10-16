@@ -16,52 +16,64 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading, error, login: apiLogin, logout: apiLogout } = useApiAuth();
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [shop, setShop] = useState<Shop | null>(null);
 
-  const login = async (email: string, password: string) => {
-    const u = await apiLogin({ email, password });
-    // attempt to load shop if any
-    try {
-      const all = await shopsApi.getAll();
-      const mine = all.shops.find((s) => s.ownerId === u.id) || null;
-      setShop(mine ?? null);
-    } catch {}
-    return u;
-  };
-
-  // When user changes (e.g., from me() on app load), try to load the associated shop
+  // Restore user and shop from localStorage on app start
   useEffect(() => {
-    const loadShop = async () => {
-      if (!user) {
-        setShop(null);
-        return;
-      }
-      try {
-        const all = await shopsApi.getAll();
-        const mine = all.shops.find((s) => s.ownerId === user.id) || null;
-        setShop(mine ?? null);
-      } catch {
-        setShop(null);
-      }
-    };
-    loadShop();
-  }, [user]);
+    const storedUser = localStorage.getItem('user');
+    const storedShop = localStorage.getItem('shop');
+    if (storedUser) setCurrentUser(JSON.parse(storedUser));
+    if (storedShop) setShop(JSON.parse(storedShop));
+  }, []);
+
+  const login = async (email: string, password: string) => {
+    const responseUser = await apiLogin({ email, password });
+
+    // extract shop info (backend returns shopId as full object)
+    const shopData = responseUser.shopId || null;
+
+    // save to localStorage
+    localStorage.setItem('user', JSON.stringify(responseUser));
+    if (shopData) {
+      localStorage.setItem('shop', JSON.stringify(shopData));
+    }
+
+    setCurrentUser(responseUser);
+    setShop(shopData as unknown as Shop);
+
+    return responseUser;
+  };
 
   const logout = async () => {
     await apiLogout();
+    setCurrentUser(null);
+    setShop(null);
+    localStorage.removeItem('user');
+    localStorage.removeItem('shop');
   };
 
+  // If backend auto-loads user, keep sync
+  useEffect(() => {
+    if (user) {
+      setCurrentUser(user);
+      if (user.shopId) {
+        setShop(user.shopId as unknown as Shop);
+        localStorage.setItem('shop', JSON.stringify(user.shopId));
+      }
+      localStorage.setItem('user', JSON.stringify(user));
+    }
+  }, [user]);
+
   const value = {
-    currentUser: user,
-    userData: user,
+    currentUser,
+    userData: currentUser,
     shop,
     login,
     logout,
@@ -83,8 +95,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             </div>
             <h1 className="text-2xl font-bold text-gray-800 mb-4">Connection Error</h1>
             <p className="text-gray-600 mb-6">{error}</p>
-            <button 
-              onClick={() => window.location.reload()} 
+            <button
+              onClick={() => window.location.reload()}
               className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
             >
               Retry Connection
