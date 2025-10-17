@@ -37,7 +37,8 @@ const Supplies: React.FC = () => {
   const products = useAppSelector(s => s.products.items as any[]);
   useEffect(() => {
     dispatch(fetchProducts({ shopId: userData?.shopId } as any));
-    dispatch(fetchSupplies({}));
+    dispatch(fetchSupplies({ shopId: userData?.shopId }));
+
   }, [dispatch, userData?.shopId]);
   const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<SupplyFormData>();
   const { confirm } = useDialog();
@@ -49,46 +50,75 @@ const Supplies: React.FC = () => {
 
   // Memoize filtered supplies for better performance
   const filteredSupplies = useMemo(() => {
-    return supplies.filter(supply => {
-      const s: any = supply as any;
-      const matchesSearch = (s.supplierName || s.supplier || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           (s.productName || '').toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesStatus = statusFilter === 'all' || (s.status || 'received') === statusFilter;
-      return matchesSearch && matchesStatus;
-    }).sort((a: any, b: any) => {
-      const dateA = a.receivedAt instanceof Date ? a.receivedAt : new Date(a.receivedAt);
-      const dateB = b.receivedAt instanceof Date ? b.receivedAt : new Date(b.receivedAt);
-      return dateB.getTime() - dateA.getTime();
-    });
+    if (!Array.isArray(supplies)) return [];
+  
+    return supplies
+      .filter(supply => {
+        const s: any = supply || {};
+        const matchesSearch =
+          (s.supplierName || s.supplier || '')
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase()) ||
+          (s.productName || '')
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase());
+  
+        const matchesStatus =
+          statusFilter === 'all' ||
+          (s.status || 'received') === statusFilter;
+  
+        return matchesSearch && matchesStatus;
+      })
+      .sort((a: any, b: any) => {
+        const dateA =
+          a.receivedAt instanceof Date ? a.receivedAt : new Date(a.receivedAt);
+        const dateB =
+          b.receivedAt instanceof Date ? b.receivedAt : new Date(b.receivedAt);
+        return dateB.getTime() - dateA.getTime();
+      });
   }, [supplies, searchQuery, statusFilter]);
+  
 
   // Show load more button if we have exactly 50 supplies (the limit)
   useEffect(() => {
-    setShowLoadMore(supplies.length === 50);
-  }, [supplies.length]);
+    if (Array.isArray(supplies)) {
+      setShowLoadMore(supplies.length === 50);
+    } else {
+      setShowLoadMore(false);
+    }
+  }, [supplies]);
+  
+
   const onSubmit = async (data: SupplyFormData) => {
     setLoading(true);
     setError('');
     
     try {
-      const product = products.find(p => p.id === data.productId);
+      const product = products.find(p => p._id === data.productId);
       if (!product) {
         throw new Error('Product not found');
       }
 
       const supplyData = {
         supplierName: data.supplierName,
-        productId: data.productId,
-        productName: product.name,
-        quantity: Number(data.quantity),
-        unitCost: Number(data.unitCost),
-        totalCost: Number(data.quantity) * Number(data.unitCost),
-        receivedAt: new Date(data.receivedAt).toISOString(),
-        status: data.status,
-        notes: data.notes,
         shopId: userData?.shopId || 'default',
-        createdBy: userData?.id || 'unknown'
+        receivedAt: new Date(data.receivedAt).toISOString(),
+        createdBy: userData?.id || 'unknown',
+      
+        // Backend expects this
+        items: [
+          {
+            productId: data.productId,
+            productName: product.name,
+            quantity: Number(data.quantity),
+            unitCost: Number(data.unitCost),
+            totalCost: Number(data.quantity) * Number(data.unitCost),
+            status: data.status,
+            notes: data.notes,
+          },
+        ],
       };
+      
 
       if (editingSupply) {
         // Handle stock changes when editing supply
@@ -203,9 +233,18 @@ const Supplies: React.FC = () => {
     }
   };
 
-  const totalCostSum = supplies.reduce((sum, supply) => sum + supply.totalCost, 0);
-  const receivedSupplies = supplies.filter(s => (s as any).status === 'received').length;
-  const pendingSupplies = supplies.filter(s => (s as any).status === 'pending').length;
+  const totalCostSum = Array.isArray(supplies)
+  ? supplies.reduce((sum, supply) => sum + (supply.totalCost || 0), 0)
+  : 0;
+
+const receivedSupplies = Array.isArray(supplies)
+  ? supplies.filter(s => (s as any).status === 'received').length
+  : 0;
+
+const pendingSupplies = Array.isArray(supplies)
+  ? supplies.filter(s => (s as any).status === 'pending').length
+  : 0;
+
 
   if (suppliesLoading) {
     return (
@@ -244,7 +283,10 @@ const Supplies: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Total Supplies</p>
-              <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{supplies.length}</p>
+              <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+  {Array.isArray(supplies) ? supplies.length : 0}
+</p>
+
             </div>
             <div className="p-3 bg-blue-100 rounded-lg">
               <Package size={24} className="text-blue-600" />
@@ -448,14 +490,14 @@ const Supplies: React.FC = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Product</label>
                   <select 
-                    {...register('productId', { required: 'Product is required' })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
-                  >
-                    <option value="">Select product...</option>
-                    {products.map(product => (
-                      <option key={product.id} value={product.id}>{product.name}</option>
-                    ))}
-                  </select>
+  {...register('productId', { required: 'Product is required' })}
+  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
+>
+  <option value="">Select product...</option>
+  {products.map(product => (
+    <option key={product._id} value={product._id}>{product.name}</option>
+  ))}
+</select>
                   {errors.productId && (
                     <p className="mt-1 text-sm text-red-600">{errors.productId.message}</p>
                   )}
